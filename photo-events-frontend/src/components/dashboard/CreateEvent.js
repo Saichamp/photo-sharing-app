@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
+import { eventAPI } from '../../services/api';
 
 const CreateEvent = ({ onEventCreated }) => {
   const [formData, setFormData] = useState({
     name: '',
     date: '',
     description: '',
-    expectedGuests: ''
+    expectedGuests: '',
+    organizerEmail: ''
   });
   const [errors, setErrors] = useState({});
   const [isCreating, setIsCreating] = useState(false);
 
   const handleInputChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors({ ...errors, [field]: '' });
     }
@@ -35,6 +36,12 @@ const CreateEvent = ({ onEventCreated }) => {
       newErrors.expectedGuests = 'Expected guests must be at least 1';
     }
     
+    if (!formData.organizerEmail.trim()) {
+      newErrors.organizerEmail = 'Organizer email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.organizerEmail)) {
+      newErrors.organizerEmail = 'Please enter a valid email';
+    }
+    
     return newErrors;
   };
 
@@ -49,35 +56,39 @@ const CreateEvent = ({ onEventCreated }) => {
 
     setIsCreating(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      const newEvent = {
-        ...formData,
-        registrations: 0,
-        status: new Date(formData.date) > new Date() ? 'upcoming' : 'active',
-        qrCode: `event-${formData.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-        photosUploaded: 0
-      };
+    try {
+      const response = await eventAPI.create(formData);
       
-      onEventCreated(newEvent);
-      setIsCreating(false);
+      // Call parent callback with new event
+      onEventCreated(response.data.event);
       
       // Reset form
       setFormData({
         name: '',
         date: '',
         description: '',
-        expectedGuests: ''
+        expectedGuests: '',
+        organizerEmail: ''
       });
-    }, 1500);
+      setErrors({});
+      
+      alert('Event created successfully! QR code: ' + response.data.event.qrCode);
+      
+    } catch (error) {
+      console.error('Create event error:', error);
+      alert('Failed to create event. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
+  // Rest of your component JSX stays the same, just add organizerEmail field:
   return (
     <div>
       <h2 style={{ color: '#1E2A38', marginBottom: '25px' }}>Create New Event</h2>
       
       <form onSubmit={handleSubmit} style={{ maxWidth: '600px' }}>
-        {/* Event Name */}
+        {/* Event Name - same as before */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{
             display: 'block',
@@ -107,7 +118,7 @@ const CreateEvent = ({ onEventCreated }) => {
           )}
         </div>
 
-        {/* Event Date */}
+        {/* Event Date - same as before */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{
             display: 'block',
@@ -137,7 +148,7 @@ const CreateEvent = ({ onEventCreated }) => {
           )}
         </div>
 
-        {/* Expected Guests */}
+        {/* Expected Guests - same as before */}
         <div style={{ marginBottom: '20px' }}>
           <label style={{
             display: 'block',
@@ -168,7 +179,37 @@ const CreateEvent = ({ onEventCreated }) => {
           )}
         </div>
 
-        {/* Description */}
+        {/* NEW: Organizer Email Field */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{
+            display: 'block',
+            marginBottom: '8px',
+            color: '#1E2A38',
+            fontWeight: '600'
+          }}>
+            Organizer Email *
+          </label>
+          <input
+            type="email"
+            value={formData.organizerEmail}
+            onChange={(e) => handleInputChange('organizerEmail', e.target.value)}
+            placeholder="your.email@example.com"
+            style={{
+              width: '100%',
+              padding: '12px 15px',
+              border: `2px solid ${errors.organizerEmail ? '#FF6F61' : '#e0e0e0'}`,
+              borderRadius: '10px',
+              fontSize: '16px'
+            }}
+          />
+          {errors.organizerEmail && (
+            <span style={{ color: '#FF6F61', fontSize: '12px', marginTop: '5px', display: 'block' }}>
+              {errors.organizerEmail}
+            </span>
+          )}
+        </div>
+
+        {/* Description - same as before */}
         <div style={{ marginBottom: '30px' }}>
           <label style={{
             display: 'block',
@@ -195,7 +236,7 @@ const CreateEvent = ({ onEventCreated }) => {
           />
         </div>
 
-        {/* Submit Button */}
+        {/* Submit Button - same as before */}
         <button
           type="submit"
           disabled={isCreating}

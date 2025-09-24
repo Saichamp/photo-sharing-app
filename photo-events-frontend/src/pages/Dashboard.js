@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { eventAPI } from '../services/api';
 import EventList from '../components/dashboard/EventList';
 import PhotoUpload from '../components/dashboard/PhotoUpload';
 import Analytics from '../components/dashboard/Analytics';
@@ -8,40 +9,96 @@ import CreateEvent from '../components/dashboard/CreateEvent';
 const Dashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('events');
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      name: 'Wedding - Raj & Priya',
-      date: '2025-09-15',
-      registrations: 45,
-      status: 'completed',
-      qrCode: 'event-raj-priya-123',
-      photosUploaded: 150
-    },
-    {
-      id: 2,
-      name: 'Corporate Event - TechCorp',
-      date: '2025-09-16',
-      registrations: 89,
-      status: 'active',
-      qrCode: 'event-techcorp-456',
-      photosUploaded: 0
-    },
-    {
-      id: 3,
-      name: 'Birthday Party - Anita',
-      date: '2025-09-18',
-      registrations: 23,
-      status: 'upcoming',
-      qrCode: 'event-anita-789',
-      photosUploaded: 0
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load events from backend
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await eventAPI.getAll();
+      
+      // Transform backend data to match frontend format
+      const transformedEvents = response.data.map(event => ({
+        id: event._id,
+        name: event.name,
+        date: event.date,
+        registrations: event.registrationCount,
+        status: event.status,
+        qrCode: event.qrCode,
+        photosUploaded: event.photosUploaded
+      }));
+      
+      setEvents(transformedEvents);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to load events:', err);
+      setError('Failed to load events. Make sure backend is running.');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  const handleEventCreated = (newEvent) => {
+    // Add new event to the list
+    setEvents(prevEvents => [{
+      id: newEvent._id || Date.now(),
+      name: newEvent.name,
+      date: newEvent.date,
+      registrations: 0,
+      status: newEvent.status,
+      qrCode: newEvent.qrCode,
+      photosUploaded: 0
+    }, ...prevEvents]);
+    
+    setActiveTab('events');
+  };
 
   const totalRegistrations = events.reduce((sum, event) => sum + event.registrations, 0);
   const totalPhotos = events.reduce((sum, event) => sum + event.photosUploaded, 0);
 
   const renderTabContent = () => {
+    if (loading) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div style={{ fontSize: '24px', marginBottom: '10px' }}>⏳</div>
+          <p>Loading events...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '60px',
+          color: '#FF6F61'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '20px' }}>⚠️</div>
+          <h3>Backend Connection Error</h3>
+          <p>{error}</p>
+          <button 
+            onClick={loadEvents}
+            style={{
+              background: '#DEA193',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'events':
         return <EventList events={events} onEventUpdate={setEvents} />;
@@ -50,15 +107,13 @@ const Dashboard = () => {
       case 'analytics':
         return <Analytics events={events} />;
       case 'create':
-        return <CreateEvent onEventCreated={(newEvent) => {
-          setEvents([...events, { ...newEvent, id: Date.now() }]);
-          setActiveTab('events');
-        }} />;
+        return <CreateEvent onEventCreated={handleEventCreated} />;
       default:
         return <EventList events={events} onEventUpdate={setEvents} />;
     }
   };
 
+  // Rest of your Dashboard component stays the same...
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
       {/* Header */}
@@ -114,7 +169,9 @@ const Dashboard = () => {
               {events.length}
             </div>
             <h3 style={{ color: '#1E2A38', margin: '0 0 5px 0' }}>Total Events</h3>
-            <p style={{ color: '#8A8A8A', margin: 0, fontSize: '14px' }}>Active and completed</p>
+            <p style={{ color: '#8A8A8A', margin: 0, fontSize: '14px' }}>
+              {loading ? 'Loading...' : 'Active and completed'}
+            </p>
           </div>
 
           <div className="card" style={{ textAlign: 'center' }}>
