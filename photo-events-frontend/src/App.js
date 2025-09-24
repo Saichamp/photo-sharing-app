@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import MultiStepForm from './components/MultiStepForm';
 import Dashboard from './pages/Dashboard';
 import './App.css';
+// In App.js, verify you have this exact route:
+<Route path="/register/:eventId" element={<MultiStepForm />} />
 
 // Simple Home Page Component
 const HomePage = () => (
