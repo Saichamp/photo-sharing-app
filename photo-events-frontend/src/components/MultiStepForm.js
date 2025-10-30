@@ -1,21 +1,12 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import QRScanner from './QRScanner';
-import FaceCapture from './FaceCapture';
-import UserForm from './UserForm';
+import { useParams, useNavigate } from 'react-router-dom';
 import { registrationAPI, eventAPI } from '../services/api';
 import './MultiStepForm.css';
 
-  
- 
-
-  // Rest of your component...
-
-
 const MultiStepForm = () => {
-  
-  const { eventId } = useParams(); // Get eventId from URL
+  const { eventId } = useParams();
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [eventInfo, setEventInfo] = useState(null);
@@ -23,11 +14,7 @@ const MultiStepForm = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
-   // DEBUG: Log everything about the URL
-  console.log('🔍 CURRENT URL:', window.location.href);
-  console.log('🔍 URL PATHNAME:', window.location.pathname);
-  console.log('🔍 useParams eventId:', eventId);
-  console.log('🔍 useParams all params:', useParams());
+
   const [formData, setFormData] = useState({
     eventId: '',
     name: '',
@@ -133,45 +120,32 @@ const MultiStepForm = () => {
   };
 
   // Submit registration to backend
-// Submit registration to backend
-const submitRegistration = async () => {
-  setIsLoading(true);
-  try {
-    console.log('🔍 DEBUG: eventId from URL:', eventId);
-    console.log('🔍 DEBUG: formData.eventId:', formData.eventId);
-    
-    // Use eventId from URL params, not from formData
-    const registrationData = {
-      eventId: eventId,  // Use the eventId from URL params directly
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      faceImageUrl: formData.capturedImage || 'placeholder-face-image.jpg'
-    };
+  const submitRegistration = async () => {
+    setIsLoading(true);
+    try {
+      const registrationData = {
+        eventId: eventId,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        faceImageUrl: formData.capturedImage || 'placeholder-face-image.jpg'
+      };
 
-    console.log('📤 Submitting registration with data:', registrationData);
-    
-    const response = await registrationAPI.create(registrationData);
-    
-    console.log('✅ Registration successful:', response.data);
-    
-    // Move to success step
-    setCurrentStep(4);
-    
-  } catch (error) {
-    console.error('❌ Registration failed:', error);
-    
-    // Handle specific error messages
-    if (error.response?.data?.error) {
-      alert('Registration failed: ' + error.response.data.error);
-    } else {
-      alert('Registration failed. Please try again.');
+      const response = await registrationAPI.create(registrationData);
+      setCurrentStep(4);
+      
+    } catch (error) {
+      console.error('Registration failed:', error);
+      
+      if (error.response?.data?.error) {
+        alert('Registration failed: ' + error.response.data.error);
+      } else {
+        alert('Registration failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   // Navigation functions
   const nextStep = () => {
@@ -180,7 +154,6 @@ const submitRegistration = async () => {
     } else if (currentStep === 2 && validateStep2()) {
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      // Submit to backend instead of just moving to step 4
       submitRegistration();
     }
   };
@@ -194,12 +167,11 @@ const submitRegistration = async () => {
   // Show loading screen while loading event
   if (loadingEvent) {
     return (
-      <div className="container">
-        <div className="card">
-          <div style={{ textAlign: 'center', padding: '60px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '20px' }}>⏳</div>
-            <h2>Loading Event...</h2>
-            <p style={{ color: '#8A8A8A' }}>Please wait while we load the event details.</p>
+      <div className="registration-container">
+        <div className="registration-card">
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading Event...</p>
           </div>
         </div>
       </div>
@@ -209,18 +181,14 @@ const submitRegistration = async () => {
   // Show error if event not found
   if (!eventInfo && eventId) {
     return (
-      <div className="container">
-        <div className="card">
-          <div style={{ textAlign: 'center', padding: '60px' }}>
-            <div style={{ fontSize: '48px', marginBottom: '20px' }}>❌</div>
-            <h2 style={{ color: '#FF6F61' }}>Event Not Found</h2>
-            <p style={{ color: '#8A8A8A', marginBottom: '30px' }}>
+      <div className="registration-container">
+        <div className="registration-card">
+          <div className="error-container">
+            <h2 className="error-title">Event Not Found</h2>
+            <p className="error-message">
               The event QR code is invalid or the event may have been removed.
             </p>
-            <button 
-              onClick={() => window.location.href = '/'}
-              className="btn-primary"
-            >
+            <button onClick={() => navigate('/')} className="btn btn-primary">
               Go Home
             </button>
           </div>
@@ -230,110 +198,113 @@ const submitRegistration = async () => {
   }
 
   // Render step content
-  const renderStep = () => {
+  const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="step">
-            <h2>📝 Registration Details</h2>
+          <div className="step-content">
+            <h2 className="step-title">Personal Details</h2>
+            <p className="step-subtitle">
+              Please provide your information to register for this event
+            </p>
+
             {eventInfo && (
-              <div style={{
-                background: 'linear-gradient(135deg, #DEA193 0%, #C8907F 100%)',
-                color: 'white',
-                padding: '15px',
-                borderRadius: '10px',
-                marginBottom: '25px',
-                textAlign: 'center'
-              }}>
-                <h3 style={{ margin: '0 0 5px 0' }}>📅 {eventInfo.name}</h3>
-                <p style={{ margin: 0, opacity: 0.9 }}>
-                  {new Date(eventInfo.date).toLocaleDateString()} • Expected: {eventInfo.expectedGuests} guests
+              <div className="event-banner">
+                <h3 className="event-name">{eventInfo.name}</h3>
+                <p className="event-details">
+                  {new Date(eventInfo.date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })} • {eventInfo.expectedGuests} expected guests
                 </p>
               </div>
             )}
-            <p>Please provide your details to register for this photo event.</p>
-            
-            <div className="form-group">
-              <label>Full Name *</label>
+
+            <div className="form-field">
+              <label className="field-label">Full Name *</label>
               <input
                 type="text"
+                className={`field-input ${errors.name ? 'error' : ''}`}
                 placeholder="Enter your full name"
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className={errors.name ? 'error' : ''}
               />
-              {errors.name && <span className="error-text">{errors.name}</span>}
+              {errors.name && <span className="field-error">{errors.name}</span>}
             </div>
 
-            <div className="form-group">
-              <label>Email Address *</label>
+            <div className="form-field">
+              <label className="field-label">Email Address *</label>
               <input
                 type="email"
+                className={`field-input ${errors.email ? 'error' : ''}`}
                 placeholder="Enter your email"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className={errors.email ? 'error' : ''}
               />
-              {errors.email && <span className="error-text">{errors.email}</span>}
+              {errors.email && <span className="field-error">{errors.email}</span>}
             </div>
 
-            <div className="form-group">
-              <label>Phone Number *</label>
+            <div className="form-field">
+              <label className="field-label">Phone Number *</label>
               <input
                 type="tel"
+                className={`field-input ${errors.phone ? 'error' : ''}`}
                 placeholder="Enter your phone number"
                 value={formData.phone}
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className={errors.phone ? 'error' : ''}
               />
-              {errors.phone && <span className="error-text">{errors.phone}</span>}
+              {errors.phone && <span className="field-error">{errors.phone}</span>}
             </div>
           </div>
         );
 
       case 2:
         return (
-          <div className="step">
-            <h2>📸 Face Capture</h2>
-            <p>We'll use your photo to find and send you pictures from the event.</p>
-            
+          <div className="step-content">
+            <h2 className="step-title">Face Recognition</h2>
+            <p className="step-subtitle">
+              We'll use your photo to automatically find and send you pictures from the event
+            </p>
+
             {!formData.capturedImage ? (
-              <div className="camera-container">
+              <div className="camera-section">
                 <video ref={videoRef} autoPlay muted className="camera-preview" />
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
                 
                 <div className="camera-controls">
                   {!stream ? (
-                    <button onClick={startCamera} className="btn-primary">
+                    <button onClick={startCamera} className="btn btn-primary">
                       📷 Start Camera
                     </button>
                   ) : (
-                    <button onClick={capturePhoto} className="btn-primary">
+                    <button onClick={capturePhoto} className="btn btn-primary">
                       📸 Capture Photo
                     </button>
                   )}
                 </div>
                 
-                {errors.camera && <div className="error-text">{errors.camera}</div>}
+                {errors.camera && <div className="field-error">{errors.camera}</div>}
                 
-                <div className="demo-option">
-                  <p style={{color: '#8A8A8A', fontSize: '14px'}}>For demo purposes:</p>
+                <div className="demo-section">
+                  <p className="demo-text">For demo purposes:</p>
                   <button 
                     onClick={() => setFormData({...formData, capturedImage: 'demo-image.jpg'})}
-                    className="btn-secondary"
+                    className="btn btn-secondary"
                   >
-                    Skip Camera (Demo)
+                    Skip Camera (Demo Mode)
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="photo-preview">
-                <h3>✅ Photo Captured Successfully!</h3>
+              <div className="photo-preview-section">
+                <h3 className="preview-success">Photo Captured Successfully!</h3>
                 {formData.capturedImage !== 'demo-image.jpg' && (
-                  <img src={formData.capturedImage} alt="Captured" className="captured-image" />
+                  <img src={formData.capturedImage} alt="Captured" className="captured-photo" />
                 )}
-                <div className="photo-actions">
-                  <button onClick={retakePhoto} className="btn-secondary">
+                <div>
+                  <button onClick={retakePhoto} className="btn btn-secondary">
                     🔄 Retake Photo
                   </button>
                 </div>
@@ -344,37 +315,44 @@ const submitRegistration = async () => {
 
       case 3:
         return (
-          <div className="step">
-            <h2>✅ Review & Confirm</h2>
-            <p>Please review your information before submitting.</p>
+          <div className="step-content">
+            <h2 className="step-title">Review & Confirm</h2>
+            <p className="step-subtitle">
+              Please review your information before submitting
+            </p>
             
-            <div className="review-info">
+            <div className="review-section">
               {eventInfo && (
-                <div className="review-item">
-                  <strong>Event:</strong> {eventInfo.name}
+                <div className="review-row">
+                  <span className="review-label">Event:</span>
+                  <span className="review-value">{eventInfo.name}</span>
                 </div>
               )}
-              <div className="review-item">
-                <strong>Name:</strong> {formData.name}
+              <div className="review-row">
+                <span className="review-label">Name:</span>
+                <span className="review-value">{formData.name}</span>
               </div>
-              <div className="review-item">
-                <strong>Email:</strong> {formData.email}
+              <div className="review-row">
+                <span className="review-label">Email:</span>
+                <span className="review-value">{formData.email}</span>
               </div>
-              <div className="review-item">
-                <strong>Phone:</strong> {formData.phone}
+              <div className="review-row">
+                <span className="review-label">Phone:</span>
+                <span className="review-value">{formData.phone}</span>
               </div>
-              <div className="review-item">
-                <strong>Photo:</strong> {formData.capturedImage ? '✅ Captured' : '❌ Not captured'}
+              <div className="review-row">
+                <span className="review-label">Photo:</span>
+                <span className="review-value">{formData.capturedImage ? '✅ Captured' : '❌ Not captured'}</span>
               </div>
             </div>
             
-            <div className="info-box">
-              <h4>📧 What happens next?</h4>
-              <ul>
-                <li>Your registration will be saved securely</li>
-                <li>When photos are uploaded, we'll find yours using face recognition</li>
-                <li>You'll receive your photos via email automatically</li>
-                <li>No spam - only your event photos!</li>
+            <div className="info-panel">
+              <h4 className="info-title">📧 What happens next?</h4>
+              <ul className="info-list">
+                <li className="info-item">Your registration will be saved securely</li>
+                <li className="info-item">When photos are uploaded, we'll find yours using AI</li>
+                <li className="info-item">You'll receive your photos via email automatically</li>
+                <li className="info-item">No spam - only your event photos!</li>
               </ul>
             </div>
           </div>
@@ -382,52 +360,51 @@ const submitRegistration = async () => {
 
       case 4:
         return (
-          <div className="step">
-            <div className="success-animation">🎉</div>
-            <h2>🎊 Registration Successful!</h2>
-            <p>Welcome to the photo sharing experience!</p>
-            
-            <div className="success-info">
-              {eventInfo && (
-                <>
-                  <h3>📅 {eventInfo.name}</h3>
-                  <p><strong>Date:</strong> {new Date(eventInfo.date).toLocaleDateString()}</p>
-                </>
-              )}
-              <p><strong>Registered as:</strong> {formData.name}</p>
-              <p><strong>Email:</strong> {formData.email}</p>
-            </div>
-            
-            <div className="next-steps">
-              <h4>📱 What's Next?</h4>
-              <div className="step-item">
-                <span className="step-number">1</span>
-                <div>
-                  <strong>Enjoy the event!</strong>
-                  <p>Have fun and smile for the camera</p>
+          <div className="step-content">
+            <div className="success-section">
+              <div className="success-icon">🎉</div>
+              <h2 className="success-title">Registration Successful!</h2>
+              <p className="success-message">
+                Welcome to the photo sharing experience!
+              </p>
+              
+              <div className="success-details">
+                {eventInfo && (
+                  <>
+                    <h3>{eventInfo.name}</h3>
+                    <p><strong>Date:</strong> {new Date(eventInfo.date).toLocaleDateString()}</p>
+                  </>
+                )}
+                <p><strong>Registered as:</strong> {formData.name}</p>
+                <p><strong>Email:</strong> {formData.email}</p>
+              </div>
+              
+              <div className="next-steps">
+                <h4 className="steps-title">What's Next?</h4>
+                <div className="step-row">
+                  <div className="step-number">1</div>
+                  <div className="step-content">
+                    <div className="step-action">Enjoy the event!</div>
+                    <div className="step-description">Have fun and smile for the camera</div>
+                  </div>
+                </div>
+                <div className="step-row">
+                  <div className="step-number">2</div>
+                  <div className="step-content">
+                    <div className="step-action">Photos will be processed</div>
+                    <div className="step-description">Our AI will find your photos automatically</div>
+                  </div>
+                </div>
+                <div className="step-row">
+                  <div className="step-number">3</div>
+                  <div className="step-content">
+                    <div className="step-action">Receive your photos</div>
+                    <div className="step-description">We'll email them to: {formData.email}</div>
+                  </div>
                 </div>
               </div>
-              <div className="step-item">
-                <span className="step-number">2</span>
-                <div>
-                  <strong>Photos will be processed</strong>
-                  <p>Our AI will find your photos automatically</p>
-                </div>
-              </div>
-              <div className="step-item">
-                <span className="step-number">3</span>
-                <div>
-                  <strong>Receive your photos</strong>
-                  <p>We'll email them to: {formData.email}</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="action-buttons">
-              <button 
-                onClick={() => window.location.href = '/'}
-                className="btn-primary"
-              >
+              <button onClick={() => navigate('/')} className="btn btn-primary">
                 🏠 Return Home
               </button>
             </div>
@@ -440,68 +417,67 @@ const submitRegistration = async () => {
   };
 
   return (
-    <div className="container">
-      <div style={{ 
-        position: 'absolute', 
-        top: '20px', 
-        right: '20px' 
-      }}>
-        <button 
-          onClick={() => window.location.href = '/dashboard'}
-          style={{
-            background: 'rgba(222, 161, 147, 0.9)',
-            color: 'white',
-            border: 'none',
-            padding: '8px 15px',
-            borderRadius: '20px',
-            fontSize: '12px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-          }}
-        >
-          📊 Dashboard
-        </button>
-      </div>
-
-      {/* Progress section */}
-      <div className="progress-container">
-        <div className="progress-bar">
-          <div className="progress" style={{width: `${(currentStep / 4) * 100}%`}}></div>
+    <div className="registration-container">
+      <div className="registration-card">
+        {/* Header */}
+        <div className="form-header">
+          {currentStep > 1 && currentStep < 4 && (
+            <button onClick={prevStep} className="back-btn">
+              ←
+            </button>
+          )}
+          <div></div>
+          <a href="/dashboard" className="dashboard-link">
+            📊 Dashboard
+          </a>
         </div>
-        
-        <div className="step-indicator">
-          Step {currentStep} of 4
-        </div>
-        
-        {/* NEW: Add step dots */}
-        <div className="step-dots">
-          {[1, 2, 3, 4].map(step => (
-            <div 
-              key={step}
-              className={`dot ${step <= currentStep ? 'active' : ''}`}
-            />
-          ))}
-        </div>
-      </div>
 
-      {/* Render step content */}
-      {renderStep()}
+        {/* Progress */}
+        <div className="progress-section">
+          <div className="progress-header">
+            <div className="step-counter">
+              Step {currentStep} of 4
+            </div>
+          </div>
+          
+          <div className="progress-bar">
+            <div className="progress-fill" style={{width: `${(currentStep / 4) * 100}%`}}></div>
+          </div>
+          
+          <div className="step-dots">
+            {[1, 2, 3, 4].map(step => (
+              <div 
+                key={step}
+                className={`step-dot ${step <= currentStep ? 'active' : ''}`}
+              />
+            ))}
+          </div>
+        </div>
 
-      {/* Add navigation button inside the component's return */}
-      <div style={{ textAlign: 'center', marginTop: '30px' }}>
-        <button 
-          onClick={nextStep}
-          disabled={isLoading}
-          className="btn-primary"
-        >
-          {isLoading && <span className="loading"></span>}
-          {isLoading ? 'Submitting...' : currentStep === 3 ? 'Submit Registration' : 'Next →'}
-        </button>
+        {/* Step Content */}
+        {renderStepContent()}
+
+        {/* Navigation */}
+        {currentStep < 4 && (
+          <div className="btn-navigation">
+            <div></div>
+            <button 
+              onClick={nextStep}
+              disabled={isLoading}
+              className="btn btn-primary btn-nav"
+            >
+              {isLoading ? (
+                <>
+                  <div className="loading-spinner" style={{width: '16px', height: '16px'}}></div>
+                  Submitting...
+                </>
+              ) : currentStep === 3 ? 'Submit Registration' : 'Next →'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
 
 export default MultiStepForm;
-

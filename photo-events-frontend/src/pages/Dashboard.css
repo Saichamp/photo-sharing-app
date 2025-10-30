@@ -2,23 +2,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --pink-50: #fde4f2;
-  --pink-100: #f9cee7;
-  --pink-200: #f4b8da;
-  --pink-300: #eea1cd;
-  --pink-400: #e68bbe;
+  /* 🌸 Primary – Rich Aesthetic Pinks (Enhanced Saturation) */
+  --pink-50: #fff5f8;   /* Soft blush white */
+  --pink-100: #ffccd8;  /* Vibrant pastel rose */
+  --pink-200: #ff99b8;  /* Lively medium pink */
+  --pink-300: #ff6699;  /* Bright coral pink */
+  --pink-400: #ff3377;  /* Rich aesthetic rose */
+  --pink-500: #e6005c;  /* Bold romantic pink */
+  --pink-600: #cc0052;  /* Deep rose accent */
+  --pink-700: #b30048;  /* Intense mauve pink */
+
+  /* 🌿 Secondary – Warm Neutrals & Cream Balance (More Life) */
+  --cream-50: #fffcf5;  /* Warm ivory background */
+  --cream-100: #f5e6d0; /* Rich beige */
+  --cream-200: #e8ccaa; /* Saturated sand tone */
+  --cream-300: #d4b088; /* Warmer latte */
+  --gray-400: #8b6f5e;  /* Richer gray-brown text */
+
+  /* ✨ Luxury Accent (More Golden) */
+  --gold-100: #ffe4a3;  /* Brighter champagne gold */
+  --gold-200: #ffcc44;  /* Vibrant golden accent */
   
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  /* Supporting grays with warmth */
+  --gray-50: #fffcf5;
+  --gray-100: #f8f4ee;
+  --gray-200: #f0e8db;
+  --gray-300: #e0d2c1;
+  --gray-500: #6b5d52;
+  --gray-600: #5a4e44;
+  --gray-700: #4a3f37;
+  --gray-800: #3a312a;
+  --gray-900: #2a221d;
 }
+
+
 
 * {
   margin: 0;
