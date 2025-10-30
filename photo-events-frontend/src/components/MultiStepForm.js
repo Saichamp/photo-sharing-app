@@ -5,7 +5,7 @@ import QRScanner from './QRScanner';
 import FaceCapture from './FaceCapture';
 import UserForm from './UserForm';
 import { registrationAPI, eventAPI } from '../services/api';
-
+import './MultiStepForm.css';
 
   
  
@@ -464,7 +464,8 @@ const submitRegistration = async () => {
         </button>
       </div>
 
-      <div className="card">
+      {/* Progress section */}
+      <div className="progress-container">
         <div className="progress-bar">
           <div className="progress" style={{width: `${(currentStep / 4) * 100}%`}}></div>
         </div>
@@ -472,30 +473,35 @@ const submitRegistration = async () => {
         <div className="step-indicator">
           Step {currentStep} of 4
         </div>
+        
+        {/* NEW: Add step dots */}
+        <div className="step-dots">
+          {[1, 2, 3, 4].map(step => (
+            <div 
+              key={step}
+              className={`dot ${step <= currentStep ? 'active' : ''}`}
+            />
+          ))}
+        </div>
+      </div>
 
-        {renderStep()}
+      {/* Render step content */}
+      {renderStep()}
 
-        {currentStep < 4 && (
-          <div className="navigation">
-            <button 
-              onClick={prevStep} 
-              disabled={currentStep === 1}
-              className="btn-secondary"
-            >
-              ← Previous
-            </button>
-            <button 
-              onClick={nextStep}
-              disabled={isLoading}
-              className="btn-primary"
-            >
-              {isLoading ? 'Submitting...' : currentStep === 3 ? 'Submit Registration' : 'Next →'}
-            </button>
-          </div>
-        )}
+      {/* Add navigation button inside the component's return */}
+      <div style={{ textAlign: 'center', marginTop: '30px' }}>
+        <button 
+          onClick={nextStep}
+          disabled={isLoading}
+          className="btn-primary"
+        >
+          {isLoading && <span className="loading"></span>}
+          {isLoading ? 'Submitting...' : currentStep === 3 ? 'Submit Registration' : 'Next →'}
+        </button>
       </div>
     </div>
   );
-};
+}
+
 export default MultiStepForm;
 
