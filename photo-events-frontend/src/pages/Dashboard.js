@@ -13,6 +13,7 @@ const Dashboard = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     loadEvents();
@@ -37,7 +38,7 @@ const Dashboard = () => {
       setError(null);
     } catch (err) {
       console.error('Failed to load events:', err);
-      setError('Failed to load events. Make sure backend is running.');
+      setError('Failed to load events. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -60,25 +61,32 @@ const Dashboard = () => {
   const totalRegistrations = events.reduce((sum, event) => sum + event.registrations, 0);
   const totalPhotos = events.reduce((sum, event) => sum + event.photosUploaded, 0);
   const avgPhotosPerPerson = totalRegistrations > 0 ? (totalPhotos / totalRegistrations).toFixed(1) : 0;
+  const activeEvents = events.filter(event => event.status === 'active').length;
 
-  const renderTabContent = () => {
+  const renderContent = () => {
     if (loading) {
       return (
-        <div className="loading-container">
+        <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p className="loading-text">Loading your events...</p>
+          <div className="loading-content">
+            <h3>Loading your events...</h3>
+            <p>Getting everything ready for you</p>
+          </div>
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="error-container">
-          <h3 className="error-title">Connection Error</h3>
-          <p className="error-message">{error}</p>
-          <button onClick={loadEvents} className="btn-retry">
-            Try Again
-          </button>
+        <div className="error-state">
+          <div className="error-icon">⚠️</div>
+          <div className="error-content">
+            <h3>Connection Error</h3>
+            <p>{error}</p>
+            <button onClick={loadEvents} className="btn-retry">
+              Try Again
+            </button>
+          </div>
         </div>
       );
     }
@@ -97,108 +105,184 @@ const Dashboard = () => {
     }
   };
 
+  const sidebarItems = [
+    { key: 'events', label: 'Events', icon: '📅', count: events.length },
+    { key: 'create', label: 'Create Event', icon: '➕', count: null },
+    { key: 'upload', label: 'Upload Photos', icon: '📸', count: null },
+    { key: 'analytics', label: 'Analytics', icon: '📊', count: null }
+  ];
+
   return (
-    <div className="dashboard-container">
-      {/* Clean Header */}
-      <div className="dashboard-header">
-        <div className="dashboard-header-content">
-          <div>
-            <h1 className="dashboard-title">PhotoEvents</h1>
-            <p className="dashboard-subtitle">
-              Event photo management made simple
+    <div className="dashboard-layout">
+      {/* Premium Sidebar */}
+      <div className={`dashboard-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <span className="brand-icon">📸</span>
+            {!sidebarCollapsed && (
+              <>
+                <span className="brand-text">PhotoEvents</span>
+                <span className="brand-badge">PRO</span>
+              </>
+            )}
+          </div>
+          <button 
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? '→' : '←'}
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          {sidebarItems.map(item => (
+            <button
+              key={item.key}
+              onClick={() => setActiveTab(item.key)}
+              className={`nav-item ${activeTab === item.key ? 'active' : ''}`}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {!sidebarCollapsed && (
+                <>
+                  <span className="nav-label">{item.label}</span>
+                  {item.count !== null && (
+                    <span className="nav-count">{item.count}</span>
+                  )}
+                </>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          {!sidebarCollapsed && (
+            <div className="user-profile">
+              <div className="user-avatar">👤</div>
+              <div className="user-info">
+                <div className="user-name">Event Manager</div>
+                <div className="user-email">pro@photoevents.com</div>
+              </div>
+            </div>
+          )}
+          
+          <button 
+            onClick={() => navigate('/')}
+            className="btn-sidebar-action"
+            title={sidebarCollapsed ? "View Landing" : undefined}
+          >
+            <span className="btn-icon">🏠</span>
+            {!sidebarCollapsed && <span>View Landing</span>}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="dashboard-main">
+        {/* Premium Header */}
+        <div className="dashboard-header">
+          <div className="header-left">
+            <h1 className="page-title">
+              {activeTab === 'events' && 'Events Management'}
+              {activeTab === 'create' && 'Create New Event'}
+              {activeTab === 'upload' && 'Photo Upload'}
+              {activeTab === 'analytics' && 'Analytics & Insights'}
+            </h1>
+            <p className="page-subtitle">
+              {activeTab === 'events' && 'Manage all your events and photo deliveries'}
+              {activeTab === 'create' && 'Set up a new event for photo automation'}
+              {activeTab === 'upload' && 'Upload and process event photos'}
+              {activeTab === 'analytics' && 'Track performance and engagement metrics'}
             </p>
           </div>
+          
           <div className="header-actions">
-            <button 
-              onClick={() => navigate('/')}
-              className="btn-header secondary"
-            >
-              View Registration
-            </button>
-            <button 
-              onClick={() => setActiveTab('create')}
-              className="btn-header"
-            >
-              New Event
-            </button>
+            {activeTab === 'events' && (
+              <button 
+                onClick={() => setActiveTab('create')}
+                className="btn-header-primary"
+              >
+                <span className="btn-icon">➕</span>
+                Create Event
+              </button>
+            )}
+            {activeTab !== 'create' && activeTab !== 'events' && (
+              <button 
+                onClick={() => setActiveTab('events')}
+                className="btn-header-secondary"
+              >
+                <span className="btn-icon">📅</span>
+                View Events
+              </button>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Statistics */}
-      <div className="stats-section">
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-header">
-              <div className="stat-icon events">📅</div>
-              <div className="stat-label">Total Events</div>
+        {/* Premium Stats Grid */}
+        {activeTab === 'events' && (
+          <div className="stats-overview">
+            <div className="stat-card primary">
+              <div className="stat-header">
+                <div className="stat-icon">📅</div>
+                <div className="stat-trend up">↗ +12%</div>
+              </div>
+              <div className="stat-content">
+                <div className="stat-number">{events.length}</div>
+                <div className="stat-label">Total Events</div>
+                <div className="stat-description">
+                  {activeEvents} active, {events.length - activeEvents} completed
+                </div>
+              </div>
             </div>
-            <div className="stat-number">{events.length}</div>
-            <div className="stat-description">Active and completed</div>
-          </div>
 
-          <div className="stat-card">
-            <div className="stat-header">
-              <div className="stat-icon registrations">👥</div>
-              <div className="stat-label">Registrations</div>
+            <div className="stat-card success">
+              <div className="stat-header">
+                <div className="stat-icon">👥</div>
+                <div className="stat-trend up">↗ +24%</div>
+              </div>
+              <div className="stat-content">
+                <div className="stat-number">{totalRegistrations.toLocaleString()}</div>
+                <div className="stat-label">Total Registrations</div>
+                <div className="stat-description">
+                  Avg {Math.round(totalRegistrations / Math.max(events.length, 1))} per event
+                </div>
+              </div>
             </div>
-            <div className="stat-number">{totalRegistrations}</div>
-            <div className="stat-description">Total users registered</div>
-          </div>
 
-          <div className="stat-card">
-            <div className="stat-header">
-              <div className="stat-icon photos">📸</div>
-              <div className="stat-label">Photos</div>
+            <div className="stat-card accent">
+              <div className="stat-header">
+                <div className="stat-icon">📸</div>
+                <div className="stat-trend up">↗ +18%</div>
+              </div>
+              <div className="stat-content">
+                <div className="stat-number">{totalPhotos.toLocaleString()}</div>
+                <div className="stat-label">Photos Processed</div>
+                <div className="stat-description">
+                  Ready for automated delivery
+                </div>
+              </div>
             </div>
-            <div className="stat-number">{totalPhotos}</div>
-            <div className="stat-description">Processed and delivered</div>
-          </div>
 
-          <div className="stat-card">
-            <div className="stat-header">
-              <div className="stat-icon avg">⚡</div>
-              <div className="stat-label">Avg/Person</div>
+            <div className="stat-card warning">
+              <div className="stat-header">
+                <div className="stat-icon">⚡</div>
+                <div className="stat-trend up">↗ +8%</div>
+              </div>
+              <div className="stat-content">
+                <div className="stat-number">{avgPhotosPerPerson}</div>
+                <div className="stat-label">Avg Photos/Person</div>
+                <div className="stat-description">
+                  Delivery efficiency metric
+                </div>
+              </div>
             </div>
-            <div className="stat-number">{avgPhotosPerPerson}</div>
-            <div className="stat-description">Photos per user</div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Main Content */}
-      <div className="dashboard-content">
-        {/* Navigation */}
-        <div className="dashboard-nav">
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`nav-tab ${activeTab === 'events' ? 'active' : ''}`}
-          >
-            Events
-          </button>
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`nav-tab ${activeTab === 'create' ? 'active' : ''}`}
-          >
-            Create Event
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`nav-tab ${activeTab === 'upload' ? 'active' : ''}`}
-          >
-            Upload Photos
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`nav-tab ${activeTab === 'analytics' ? 'active' : ''}`}
-          >
-            Analytics
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="content-card">
-          {renderTabContent()}
+        {/* Content Area */}
+        <div className="content-container">
+          <div className="content-card">
+            {renderContent()}
+          </div>
         </div>
       </div>
     </div>
