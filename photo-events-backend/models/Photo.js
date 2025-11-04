@@ -18,6 +18,7 @@ const photoSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // NEW: Enhanced face detection storage
   faces: [{
     boundingBox: {
       x: Number,
@@ -25,8 +26,14 @@ const photoSchema = new mongoose.Schema({
       width: Number,
       height: Number
     },
-    embedding: [Number], // Face recognition vector
-    confidence: Number
+    embedding: [Number], // 512-dimensional face recognition vector
+    confidence: Number,
+    // NEW: Quality assessment for blurry image handling
+    quality: {
+      sharpness: Number,
+      brightness: Number,
+      isBlurry: Boolean
+    }
   }],
   uploadedAt: {
     type: Date,

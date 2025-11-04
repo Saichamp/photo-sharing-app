@@ -33,6 +33,9 @@ connectDB();
 app.use('/api/events', require('./connections/events'));
 app.use('/api/registrations', require('./connections/registrations'));
 
+// NEW: Face matching routes
+app.use('/api/face-matching', require('./routes/faceMatching'));
+
 // Test route
 app.get('/', (req, res) => {
   res.json({ 
@@ -40,7 +43,9 @@ app.get('/', (req, res) => {
     mongoStatus: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     endpoints: {
       events: '/api/events',
-      registrations: '/api/registrations'
+      registrations: '/api/registrations',
+      // NEW: Face matching endpoint
+      faceMatching: '/api/face-matching'
     }
   });
 });
@@ -48,4 +53,6 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🌐 Test at: http://localhost:${PORT}`);
+  // NEW: Face matching API message
+  console.log(`📸 Face matching API available at: /api/face-matching`);
 });

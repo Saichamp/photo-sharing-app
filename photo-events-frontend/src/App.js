@@ -2,9 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import MultiStepForm from './components/MultiStepForm';
 import Dashboard from './pages/Dashboard';
+import FaceRecognitionTest from './components/FaceRecognitionTest';
 import './App.css';
-// In App.js, verify you have this exact route:
-<Route path="/register/:eventId" element={<MultiStepForm />} />
 
 // Simple Home Page Component
 const HomePage = () => (
@@ -50,6 +49,7 @@ function App() {
           <Route path="/register" element={<MultiStepForm />} />
           <Route path="/register/:eventId" element={<MultiStepForm />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/face-test" element={<FaceRecognitionTest />} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </div>

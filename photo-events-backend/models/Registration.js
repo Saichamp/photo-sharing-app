@@ -26,8 +26,9 @@ const registrationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // NEW: Face embedding for AI recognition
   faceEmbedding: {
-    type: [Number], // Array of numbers for face recognition
+    type: [Number], // 512-dimensional ArcFace embedding
     default: []
   },
   registeredAt: {
@@ -39,6 +40,7 @@ const registrationSchema = new mongoose.Schema({
     enum: ['active', 'processed', 'photos_sent'],
     default: 'active'
   },
+  // NEW: Store matched photos with confidence scores
   photosMatched: [{
     photoId: String,
     matchConfidence: Number,
