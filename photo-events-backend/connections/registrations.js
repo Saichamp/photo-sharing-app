@@ -3,6 +3,7 @@ const router = express.Router();
 const { createRegistration, getEventRegistrations } = require('../controllers/registrationController');
 
 // POST /api/registrations - Create new registration
+// Temporarily remove uploadSingle until we set it up properly
 router.post('/', createRegistration);
 
 // GET /api/registrations/:eventId - Get event registrations
