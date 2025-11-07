@@ -1,6 +1,4 @@
 const Photo = require('../models/Photo');
-const path = require('path');
-const fs = require('fs').promises;
 
 // Upload multiple photos for an event
 const uploadPhotos = async (req, res) => {
@@ -29,9 +27,6 @@ const uploadPhotos = async (req, res) => {
     const savedPhotos = await Photo.insertMany(photoDocuments);
 
     console.log(`✅ ${savedPhotos.length} photos saved to database`);
-
-    // TODO: Trigger face detection processing (will implement later)
-    // processPhotosInBackground(savedPhotos);
 
     res.status(201).json({
       message: 'Photos uploaded successfully',

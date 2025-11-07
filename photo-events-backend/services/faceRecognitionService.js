@@ -1,6 +1,4 @@
 // Placeholder for face recognition logic
-// Will use face-api.js or AWS Rekognition later
-
 class FaceRecognitionService {
   
   // Extract face embedding from image
@@ -27,8 +25,7 @@ class FaceRecognitionService {
       
       const matches = [];
       
-      // TODO: Implement actual face matching using cosine similarity
-      // For now, return mock matches
+      // TODO: Implement actual face matching
       
       return matches;
       
@@ -44,7 +41,6 @@ class FaceRecognitionService {
       console.log('👁️ Detecting faces in:', imagePath);
       
       // TODO: Implement actual face detection
-      // Return mock face data
       const mockFaces = [
         {
           boundingBox: { x: 100, y: 100, width: 200, height: 200 },
