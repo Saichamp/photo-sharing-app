@@ -18,10 +18,10 @@ try:
     
     # Read test image
     print("📸 Reading test image...")
-    img = cv2.imread('test_face.jpg')
+    img = cv2.imread('test_face1.jpg')
     
     if img is None:
-        print("❌ ERROR: test_face.jpg not found!")
+        print("❌ ERROR: test_face.1jpg not found!")
         print("Please ensure the image exists from previous step.")
         import sys
         sys.exit(1)

@@ -12,8 +12,8 @@ print("=" * 50)
 
 # Check if test image exists
 import os
-if not os.path.exists('test_face.jpg'):
-    print("\n❌ ERROR: test_face.jpg not found!")
+if not os.path.exists('test_face.1jpg'):
+    print("\n❌ ERROR: test_face.1jpg not found!")
     print("Please download a test image or use your own photo.")
     sys.exit(1)
 
@@ -25,7 +25,7 @@ try:
     
     # Read test image
     print("📸 Reading test image...")
-    img = cv2.imread('test_face.jpg')
+    img = cv2.imread('test_face.1jpg')
     
     if img is None:
         print("❌ ERROR: Could not read image file!")
