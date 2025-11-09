@@ -1,54 +1,60 @@
 const mongoose = require('mongoose');
 
-const photoSchema = new mongoose.Schema({
-  eventId: {
+const FaceSchema = new mongoose.Schema({
+  faceIndex: {
+    type: Number,
+    required: true
+  },
+  embedding: {
+    type: [Number],  // Array of 512 numbers
+    required: true
+  },
+  boundingBox: {
+    type: [Number],  // [x, y, width, height]
+    required: true
+  },
+  age: {
+    type: Number
+  },
+  gender: {
     type: String,
-    required: true,
-    index: true
+    enum: ['M', 'F']
+  },
+  confidence: {
+    type: Number  // Detection confidence 0-1
+  }
+}, { _id: false });
+
+const PhotoSchema = new mongoose.Schema({
+  eventId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: true
   },
   filename: {
     type: String,
     required: true
   },
-  originalName: {
+  url: {
     type: String,
     required: true
   },
-  imageUrl: {
-    type: String,
-    required: true
+  
+  // NEW: Face recognition fields
+  faces: [FaceSchema],  // Array of detected faces with embeddings
+  processed: {
+    type: Boolean,
+    default: false
   },
-  // NEW: Enhanced face detection storage
-  faces: [{
-    boundingBox: {
-      x: Number,
-      y: Number,
-      width: Number,
-      height: Number
-    },
-    embedding: [Number], // 512-dimensional face recognition vector
-    confidence: Number,
-    // NEW: Quality assessment for blurry image handling
-    quality: {
-      sharpness: Number,
-      brightness: Number,
-      isBlurry: Boolean
-    }
-  }],
+  processingError: {
+    type: String,
+    default: null
+  },
+  
   uploadedAt: {
     type: Date,
     default: Date.now
-  },
-  processedAt: {
-    type: Date
-  },
-  status: {
-    type: String,
-    enum: ['uploaded', 'processing', 'processed', 'matched'],
-    default: 'uploaded'
   }
 });
 
-photoSchema.index({ eventId: 1, status: 1 });
-
-module.exports = mongoose.model('Photo', photoSchema);
+module.exports = mongoose.model('Photo', PhotoSchema);

@@ -1,54 +1,47 @@
 const mongoose = require('mongoose');
 
-const registrationSchema = new mongoose.Schema({
+const RegistrationSchema = new mongoose.Schema({
   eventId: {
-    type: String,
-    required: true,
-    index: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: true
   },
   name: {
     type: String,
-    required: true,
-    trim: true
+    required: true
   },
   email: {
     type: String,
-    required: true,
-    lowercase: true,
-    trim: true
+    required: true
   },
   phone: {
     type: String,
-    required: true,
-    trim: true
-  },
-  faceImageUrl: {
-    type: String,
     required: true
   },
-  // NEW: Face embedding for AI recognition
+  
+  // NEW: Face recognition fields
+  selfieUrl: {
+    type: String,
+    default: null
+  },
   faceEmbedding: {
-    type: [Number], // 512-dimensional ArcFace embedding
-    default: []
+    type: [Number],  // Array of 512 numbers
+    default: null
+  },
+  faceProcessed: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Existing QR code fields
+  qrCode: {
+    type: String,
+    unique: true
   },
   registeredAt: {
     type: Date,
     default: Date.now
-  },
-  status: {
-    type: String,
-    enum: ['active', 'processed', 'photos_sent'],
-    default: 'active'
-  },
-  // NEW: Store matched photos with confidence scores
-  photosMatched: [{
-    photoId: String,
-    matchConfidence: Number,
-    matchedAt: Date
-  }]
+  }
 });
 
-// Index for faster queries
-registrationSchema.index({ eventId: 1, email: 1 });
-
-module.exports = mongoose.model('Registration', registrationSchema);
+module.exports = mongoose.model('Registration', RegistrationSchema);

@@ -23,3 +23,10 @@ yarn-debug.log*
 yarn-error.log*
 
 /venv
+# Uploads
+uploads/faces/*
+uploads/photos/*
+
+# But keep the folders
+!uploads/faces/.gitkeep
+!uploads/photos/.gitkeep
