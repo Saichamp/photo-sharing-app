@@ -69,3 +69,6 @@ app.listen(PORT, () => {
   // ✨ ADD THIS - Photos API message
   console.log(`📷 Photo upload API available at: /api/photos`);
 });
+// Add after existing routes
+const photoRoutes = require('./routes/photos');
+app.use('/api/photos', photoRoutes);
