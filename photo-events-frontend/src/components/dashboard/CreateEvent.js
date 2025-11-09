@@ -65,8 +65,11 @@ const CreateEvent = ({ onEventCreated }) => {
     return newErrors;
   };
 
-  const handleNextStep = () => {
-    const newErrors = currentStep === 1 ? validateStep1() : {};
+  // ✅ FIX: Changed to regular function, not form submission
+  const handleNextStep = (e) => {
+    if (e) e.preventDefault(); // Prevent form submission
+    
+    const newErrors = validateStep1();
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -94,18 +97,27 @@ const CreateEvent = ({ onEventCreated }) => {
     setIsCreating(true);
 
     try {
+      console.log('📤 Creating event:', formData);
+      
       const response = await eventAPI.create(formData);
       
-      setCreatedEvent(response.data.event);
+      console.log('✅ Event created:', response.data);
+      
+      // Handle both response formats
+      const eventData = response.data.data || response.data.event || response.data;
+      
+      setCreatedEvent(eventData);
       setShowSuccess(true);
       
       // Call parent callback
-      onEventCreated(response.data.event);
+      if (onEventCreated) {
+        onEventCreated(eventData);
+      }
       
     } catch (error) {
-      console.error('Create event error:', error);
+      console.error('❌ Create event error:', error);
       setErrors({ 
-        submit: error.response?.data?.message || 'Failed to create event. Please try again.' 
+        submit: error.response?.data?.message || error.message || 'Failed to create event. Please try again.' 
       });
     } finally {
       setIsCreating(false);
@@ -127,6 +139,8 @@ const CreateEvent = ({ onEventCreated }) => {
   };
 
   const copyRegistrationLink = () => {
+    if (!createdEvent || !createdEvent.qrCode) return;
+    
     const link = `${window.location.origin}/register/${createdEvent.qrCode}`;
     navigator.clipboard.writeText(link);
     
@@ -134,14 +148,31 @@ const CreateEvent = ({ onEventCreated }) => {
     const notification = document.createElement('div');
     notification.className = 'copy-notification';
     notification.textContent = '✅ Registration link copied!';
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      z-index: 9999;
+      animation: slideIn 0.3s ease-out;
+    `;
     document.body.appendChild(notification);
     
     setTimeout(() => {
-      notification.classList.add('fade-out');
-      setTimeout(() => document.body.removeChild(notification), 300);
+      notification.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 300);
     }, 2000);
   };
 
+  // Success View
   if (showSuccess && createdEvent) {
     return (
       <div className="create-event-container">
@@ -175,35 +206,41 @@ const CreateEvent = ({ onEventCreated }) => {
                 </span>
               </div>
               
-              <div className="detail-row">
-                <span className="detail-label">Expected Guests:</span>
-                <span className="detail-value">{createdEvent.expectedGuests}</span>
-              </div>
+              {createdEvent.expectedGuests && (
+                <div className="detail-row">
+                  <span className="detail-label">Expected Guests:</span>
+                  <span className="detail-value">{createdEvent.expectedGuests}</span>
+                </div>
+              )}
               
-              <div className="detail-row">
-                <span className="detail-label">Event ID:</span>
-                <span className="detail-value event-id">{createdEvent.qrCode}</span>
-              </div>
+              {createdEvent.qrCode && (
+                <div className="detail-row">
+                  <span className="detail-label">Event ID:</span>
+                  <span className="detail-value event-id">{createdEvent.qrCode}</span>
+                </div>
+              )}
             </div>
 
-            <div className="registration-link-section">
-              <h4>Registration Link</h4>
-              <div className="link-container">
-                <input 
-                  type="text" 
-                  value={`${window.location.origin}/register/${createdEvent.qrCode}`}
-                  readOnly
-                  className="link-input"
-                />
-                <button 
-                  onClick={copyRegistrationLink}
-                  className="copy-link-btn"
-                >
-                  📋 Copy
-                </button>
+            {createdEvent.qrCode && (
+              <div className="registration-link-section">
+                <h4>Registration Link</h4>
+                <div className="link-container">
+                  <input 
+                    type="text" 
+                    value={`${window.location.origin}/register/${createdEvent.qrCode}`}
+                    readOnly
+                    className="link-input"
+                  />
+                  <button 
+                    onClick={copyRegistrationLink}
+                    className="copy-link-btn"
+                  >
+                    📋 Copy
+                  </button>
+                </div>
+                <p className="link-help">Share this link with guests to register for the event</p>
               </div>
-              <p className="link-help">Share this link with guests to register for the event</p>
-            </div>
+            )}
           </div>
 
           <div className="success-actions">
@@ -214,7 +251,7 @@ const CreateEvent = ({ onEventCreated }) => {
               Create Another Event
             </button>
             <button 
-              onClick={() => {/* Navigate to events */}}
+              onClick={() => window.location.href = '/dashboard'}
               className="btn btn-primary"
             >
               View All Events
@@ -225,6 +262,7 @@ const CreateEvent = ({ onEventCreated }) => {
     );
   }
 
+  // Main Form View
   return (
     <div className="create-event-container">
       {/* Progress Indicator */}
@@ -267,8 +305,10 @@ const CreateEvent = ({ onEventCreated }) => {
           </p>
         </div>
 
-        <form onSubmit={currentStep === 1 ? handleNextStep : handleSubmit} className="event-form">
-          {currentStep === 1 ? (
+        {/* ✅ FIX: Only Step 2 has form submission */}
+        <form onSubmit={currentStep === 2 ? handleSubmit : (e) => e.preventDefault()} className="event-form">
+          {/* Step 1: Event Details */}
+          {currentStep === 1 && (
             <div className="form-step">
               <div className="form-group">
                 <label className="form-label">
@@ -322,8 +362,22 @@ const CreateEvent = ({ onEventCreated }) => {
                   {formData.description.length}/500 characters
                 </div>
               </div>
+
+              {/* ✅ FIX: Button with type="button" */}
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="btn btn-primary"
+                >
+                  Continue →
+                </button>
+              </div>
             </div>
-          ) : (
+          )}
+
+          {/* Step 2: Configuration */}
+          {currentStep === 2 && (
             <div className="form-step">
               <div className="form-group">
                 <label className="form-label">
@@ -335,7 +389,7 @@ const CreateEvent = ({ onEventCreated }) => {
                   className={`form-input ${errors.expectedGuests ? 'error' : ''}`}
                   placeholder="e.g., 150"
                   value={formData.expectedGuests}
-                  onChange={(e) => handleInputChange('expectedGuests', e.target.value)}
+                  onChange={(e) => handleInputChange('expectedGuests', parseInt(e.target.value) || '')}
                   min="1"
                   max="10000"
                 />
@@ -369,44 +423,40 @@ const CreateEvent = ({ onEventCreated }) => {
                   <li>✅ Ready to receive guest registrations</li>
                 </ul>
               </div>
-            </div>
-          )}
 
-          {errors.submit && (
-            <div className="form-error-banner">
-              <span className="error-icon">⚠️</span>
-              <span>{errors.submit}</span>
-            </div>
-          )}
-
-          <div className="form-actions">
-            {currentStep === 2 && (
-              <button
-                type="button"
-                onClick={handlePrevStep}
-                className="btn btn-secondary"
-              >
-                ← Back
-              </button>
-            )}
-            
-            <button
-              type="submit"
-              disabled={isCreating}
-              className="btn btn-primary"
-            >
-              {isCreating ? (
-                <>
-                  <span className="loading-spinner"></span>
-                  Creating Event...
-                </>
-              ) : currentStep === 1 ? (
-                'Continue →'
-              ) : (
-                '🎉 Create Event'
+              {errors.submit && (
+                <div className="form-error-banner">
+                  <span className="error-icon">⚠️</span>
+                  <span>{errors.submit}</span>
+                </div>
               )}
-            </button>
-          </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={handlePrevStep}
+                  className="btn btn-secondary"
+                >
+                  ← Back
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="btn btn-primary"
+                >
+                  {isCreating ? (
+                    <>
+                      <span className="loading-spinner"></span>
+                      Creating Event...
+                    </>
+                  ) : (
+                    '🎉 Create Event'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       </div>
 

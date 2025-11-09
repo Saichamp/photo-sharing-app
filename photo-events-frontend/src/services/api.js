@@ -11,22 +11,26 @@ const api = axios.create({
 
 // Event API calls
 export const eventAPI = {
-  // Create new event
   create: (eventData) => api.post('/events', eventData),
-  
-  // Get all events
   getAll: () => api.get('/events'),
-  
-  // Get single event by QR code
   getByQRCode: (qrCode) => api.get(`/events/${qrCode}`)
 };
 
 // Registration API calls
 export const registrationAPI = {
-  // Create new registration
-  create: (registrationData) => api.post('/registrations', registrationData),
-  
-  // Get registrations for an event
+  // ✅ FIX: Updated to handle FormData
+  create: (registrationData) => {
+    // If it's FormData, set proper headers
+    if (registrationData instanceof FormData) {
+      return api.post('/registrations', registrationData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    }
+    // Otherwise send as JSON
+    return api.post('/registrations', registrationData);
+  },
   getByEvent: (eventId) => api.get(`/registrations/${eventId}`)
 };
 
