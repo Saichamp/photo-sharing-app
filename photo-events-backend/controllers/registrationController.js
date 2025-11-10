@@ -16,10 +16,13 @@ const generateQRCode = async (eventId, registrationId) => {
 };
 
 // POST - Register for an event
+// POST - Register for an event
 exports.registerForEvent = async (req, res) => {
   try {
     const { eventId, name, email, phone } = req.body;
     const selfieFile = req.file; // Uploaded selfie (if using multer)
+
+    console.log('📝 Registration attempt:', { eventId, name, email });
 
     // Validate required fields
     if (!eventId || !name || !email || !phone) {
@@ -29,19 +32,35 @@ exports.registerForEvent = async (req, res) => {
       });
     }
 
-    // Check if event exists
-    const event = await Event.findById(eventId);
+    // ✅ FIX: Check if event exists - handle both ObjectId and QR code
+    let event;
+    
+    // Try to find by _id if it looks like an ObjectId (24 hex characters)
+    if (eventId.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log('🔍 Looking up event by ObjectId:', eventId);
+      event = await Event.findById(eventId);
+    }
+    
+    // If not found, try to find by QR code
     if (!event) {
+      console.log('🔍 Looking up event by QR code:', eventId);
+      event = await Event.findOne({ qrCode: eventId });
+    }
+
+    if (!event) {
+      console.error('❌ Event not found:', eventId);
       return res.status(404).json({
         success: false,
-        message: 'Event not found'
+        message: 'Event not found. Please check the event code.'
       });
     }
 
-    // Check for duplicate registration
+    console.log('✅ Event found:', event._id, '-', event.name);
+
+    // ✅ FIX: Use the actual MongoDB _id for duplicate check
     const existingRegistration = await Registration.findOne({
-      eventId,
-      email
+      eventId: event._id.toString(), // Use MongoDB _id
+      email: email.toLowerCase()
     });
 
     if (existingRegistration) {
@@ -51,11 +70,11 @@ exports.registerForEvent = async (req, res) => {
       });
     }
 
-    // Create registration object
+    // Create registration object with actual MongoDB _id
     const registrationData = {
-      eventId,
+      eventId: event._id.toString(), // ✅ Use MongoDB _id, not QR code
       name,
-      email,
+      email: email.toLowerCase(),
       phone
     };
 
@@ -99,9 +118,11 @@ exports.registerForEvent = async (req, res) => {
     await registration.save();
 
     // Generate QR code
-    const qrCode = await generateQRCode(eventId, registration._id);
+    const qrCode = await generateQRCode(event._id.toString(), registration._id.toString());
     registration.qrCode = qrCode;
     await registration.save();
+
+    console.log('✅ Registration created:', registration._id);
 
     res.status(201).json({
       success: true,
@@ -110,6 +131,8 @@ exports.registerForEvent = async (req, res) => {
         registrationId: registration._id,
         name: registration.name,
         email: registration.email,
+        eventName: event.name,
+        eventDate: event.date,
         qrCode: registration.qrCode,
         faceProcessed: registration.faceProcessed || false,
         selfieUrl: registration.selfieUrl
@@ -117,7 +140,7 @@ exports.registerForEvent = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('❌ Registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Registration failed',
@@ -125,6 +148,7 @@ exports.registerForEvent = async (req, res) => {
     });
   }
 };
+
 
 // GET - Get all registrations for an event
 exports.getEventRegistrations = async (req, res) => {
