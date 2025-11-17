@@ -20,8 +20,8 @@ print("BALANCED: Speed + Accuracy Optimized Search")
 print("=" * 80)
 
 # Check files
-if not os.path.exists('selfie2.jpg'):
-    print("\n❌ ERROR: selfie2.jpg not found!")
+if not os.path.exists('face1.jpg'):
+    print("\n❌ ERROR: face1.jpg not found!")
     sys.exit(1)
 
 group_photos = glob.glob('group*.jpg')
@@ -82,7 +82,7 @@ try:
     print("STEP 1: Processing Selfie")
     print("=" * 80)
     
-    selfie = cv2.imread('selfie2.jpg')
+    selfie = cv2.imread('face1.jpg')
     print(f"   Original size: {selfie.shape[1]}x{selfie.shape[0]}")
     selfie = preprocess_image(selfie)
     
