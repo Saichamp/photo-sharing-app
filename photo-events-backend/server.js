@@ -1,74 +1,194 @@
+/**
+ * PhotoManEa Backend Server
+ * Production-ready Express server with security, logging, and error handling
+ */
+
 require('dotenv').config();
-
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-// ✨ ADD THIS - Import error handler
-const errorHandler = require('./middleware/errorHandler');
+const path = require('path');
 
+// Import configurations
+const config = require('./config/config');
+const connectDB = require('./config/database');
+const { applySecurity } = require('./config/security');
+
+// Import middleware
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { requestLogger, logger } = require('./utils/logger');
+
+// Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-// ✨ ADD THIS - Serve uploaded files as static
-app.use('/uploads', express.static('uploads'));
+// ============================================
+// 1. TRUST PROXY (for accurate IP addresses behind reverse proxy)
+// ============================================
+app.set('trust proxy', 1);
 
-// Connect to MongoDB
-const connectDB = async () => {
-  try {
-    console.log('🔄 Connecting to MongoDB...');
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-    });
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
-  }
-};
+// ============================================
+// 2. BASIC MIDDLEWARE
+// ============================================
+app.use(express.json({ limit: '50mb' })); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded bodies
 
-connectDB();
+// ============================================
+// 3. REQUEST LOGGING
+// ============================================
+app.use(requestLogger); // Log all HTTP requests
 
-// Routes
-app.use('/api/events', require('./connections/events'));
-app.use('/api/registrations', require('./connections/registrations'));
+// ============================================
+// 4. SECURITY MIDDLEWARE
+// ============================================
+applySecurity(app); // Helmet, CORS, Rate Limiting, etc.
+logger.info('✅ Security middleware applied');
 
-// NEW: Face matching routes
-app.use('/api/face-matching', require('./routes/faceMatching'));
+// ============================================
+// 5. STATIC FILES
+// ============================================
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+logger.info('✅ Static file serving configured for /uploads');
 
-// ✨ ADD THIS - Photo upload routes
-app.use('/api/photos', require('./routes/photos'));
+// ============================================
+// 6. HEALTH CHECK ENDPOINT (before routes)
+// ============================================
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'PhotoManEa Backend is running',
+    timestamp: new Date().toISOString(),
+    environment: config.server.env,
+    uptime: process.uptime()
+  });
+});
 
-// Test route
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Photo Events API is running! 🚀',
-    mongoStatus: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
-    endpoints: {
-      events: '/api/events',
-      registrations: '/api/registrations',
-      // NEW: Face matching endpoint
-      faceMatching: '/api/face-matching',
-      // ✨ ADD THIS - Photos endpoint
-      photos: '/api/photos'
+app.get('/api/status', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'operational',
+    database: 'connected',
+    services: {
+      api: 'active',
+      faceRecognition: 'active',
+      fileUpload: 'active'
     }
   });
 });
 
-// ✨ ADD THIS - Error handling middleware (must be AFTER all routes)
+// ============================================
+// 7. API ROUTES
+// ============================================
+logger.info('📡 Loading API routes...');
+
+try {
+  // Events routes
+  app.use('/api/events', require('./routes/events'));
+  logger.info('  ✅ Events routes loaded');
+  
+  // Registration routes
+  app.use('/api/registrations', require('./routes/registrations'));
+  logger.info('  ✅ Registration routes loaded');
+  
+  // Photo routes
+  app.use('/api/photos', require('./routes/photos'));
+  logger.info('  ✅ Photo routes loaded');
+  
+  // Face matching routes
+  app.use('/api/face-matching', require('./routes/faceMatching'));
+  logger.info('  ✅ Face matching routes loaded');
+  
+  logger.info('✅ All routes loaded successfully');
+} catch (error) {
+  logger.error('❌ Failed to load routes:', error);
+  console.error('Route loading error:', error.message);
+  process.exit(1);
+}
+
+// ============================================
+// 8. 404 HANDLER (Route not found)
+// ============================================
+app.use(notFoundHandler);
+
+// ============================================
+// 9. GLOBAL ERROR HANDLER (Must be last)
+// ============================================
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Test at: http://localhost:${PORT}`);
-  // NEW: Face matching API message
-  console.log(`📸 Face matching API available at: /api/face-matching`);
-  // ✨ ADD THIS - Photos API message
-  console.log(`📷 Photo upload API available at: /api/photos`);
+// ============================================
+// 10. DATABASE CONNECTION
+// ============================================
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    logger.info('🔄 Connecting to MongoDB...');
+    await connectDB();
+    logger.info('✅ MongoDB connected successfully');
+    
+    // Start server
+    const PORT = config.server.port;
+    const HOST = config.server.host;
+    
+    app.listen(PORT, HOST, () => {
+      console.log('');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🚀 PhotoManEa Backend Server Started Successfully!');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`📍 Server URL: http://${HOST}:${PORT}`);
+      console.log(`🌍 Environment: ${config.server.env}`);
+      console.log(`🔐 Security: Enabled (Helmet, CORS, Rate Limiting)`);
+      console.log(`📊 Logging: ${config.logging.level.toUpperCase()}`);
+      console.log(`🎯 Frontend URL: ${config.server.frontendUrl}`);
+      console.log('');
+      console.log('📡 Available Endpoints:');
+      console.log('   GET  /api/health           - Health check');
+      console.log('   GET  /api/status           - System status');
+      console.log('   POST /api/events           - Create event');
+      console.log('   GET  /api/events           - List events');
+      console.log('   POST /api/registrations    - Guest registration');
+      console.log('   POST /api/photos/upload    - Upload photos');
+      console.log('   POST /api/face-matching    - Face matching');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('');
+      
+      logger.info(`Server started on ${HOST}:${PORT}`);
+    });
+    
+  } catch (error) {
+    logger.error('❌ Failed to start server:', error);
+    console.error('Startup error:', error.message);
+    process.exit(1);
+  }
+};
+
+// ============================================
+// 11. GRACEFUL SHUTDOWN
+// ============================================
+const gracefulShutdown = (signal) => {
+  logger.info(`\n${signal} received. Starting graceful shutdown...`);
+  
+  process.exit(0);
+};
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('💥 UNCAUGHT EXCEPTION! Shutting down...', error);
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
 });
-// Add after existing routes
-const photoRoutes = require('./routes/photos');
-app.use('/api/photos', photoRoutes);
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('💥 UNHANDLED REJECTION! Shutting down...', { reason, promise });
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+// ============================================
+// 12. START THE SERVER
+// ============================================
+startServer();
+
+// Export app for testing
+module.exports = app;

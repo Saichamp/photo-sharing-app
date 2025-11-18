@@ -30,3 +30,18 @@ uploads/photos/*
 # But keep the folders
 !uploads/faces/.gitkeep
 !uploads/photos/.gitkeep
+
+# Add to .gitignore (if not already there)
+echo ".env
+.env.production
+.env.local
+node_modules/
+uploads/
+venv/
+*.pyc
+__pycache__/
+.DS_Store
+*.log
+npm-debug.log*
+.vscode/
+.idea/" >> .gitignore
