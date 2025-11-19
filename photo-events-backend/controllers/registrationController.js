@@ -1,235 +1,236 @@
+/**
+ * Registration Controller for PhotoManEa
+ * Handles guest registration for events
+ */
+
 const Registration = require('../models/Registration');
 const Event = require('../models/Event');
-const QRCode = require('qrcode');
+const { AppError, asyncHandler, successResponse } = require('../middleware/errorHandler');
+const { logDatabase, logFile, logger } = require('../utils/logger');
+const faceRecognitionService = require('../services/faceRecognitionService');
 const path = require('path');
-const faceService = require('../services/faceRecognitionService');
 
-// Generate unique QR code
-const generateQRCode = async (eventId, registrationId) => {
-  const qrData = JSON.stringify({
-    eventId: eventId,
-    registrationId: registrationId,
-    timestamp: new Date().toISOString()
+/**
+ * @desc    Register guest for an event
+ * @route   POST /api/registrations
+ * @access  Public
+ */
+exports.registerGuest = asyncHandler(async (req, res, next) => {
+  const { eventId, name, email, phone } = req.body;
+  
+  // Validate required fields
+  if (!eventId || !name || !email || !phone) {
+    throw new AppError('Event ID, name, email, and phone are required', 400);
+  }
+  
+  // Verify event exists
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+  
+  // Check if already registered
+  const existingRegistration = await Registration.findOne({ eventId, email });
+  
+  if (existingRegistration) {
+    throw new AppError('Email already registered for this event', 409);
+  }
+  
+  // Process selfie if provided
+  let faceEmbedding = null;
+  let selfiePath = null;
+  
+  if (req.file) {
+    selfiePath = req.file.path;
+    
+    try {
+      // Extract face from selfie
+      const result = await faceRecognitionService.extractFaces(selfiePath);
+      
+      if (result.success && result.faces && result.faces.length > 0) {
+        faceEmbedding = result.faces[0].embedding;
+        
+        logFile('selfie-upload', req.file.filename, {
+          registrationEmail: email,
+          eventId
+        });
+      } else {
+        // Delete file if no face detected
+        const fs = require('fs').promises;
+        await fs.unlink(selfiePath).catch(() => {});
+        throw new AppError('No face detected in selfie. Please upload a clear photo.', 400);
+      }
+    } catch (error) {
+      // Clean up file on error
+      const fs = require('fs').promises;
+      await fs.unlink(selfiePath).catch(() => {});
+      throw new AppError('Face detection failed: ' + error.message, 500);
+    }
+  }
+  
+  // Create registration
+  const registration = await Registration.create({
+    eventId,
+    name,
+    email,
+    phone,
+    faceEmbedding,
+    selfiePath
   });
   
-  return await QRCode.toDataURL(qrData);
-};
+  // Increment event registration count
+  await event.incrementRegistration();
+  
+  logDatabase('CREATE', 'registrations', {
+    registrationId: registration._id,
+    eventId,
+    email
+  });
+  
+  logger.info('Guest registered', {
+    registrationId: registration._id,
+    eventId,
+    email,
+    hasFaceData: !!faceEmbedding
+  });
+  
+  successResponse(res, {
+    id: registration._id,
+    name: registration.name,
+    email: registration.email,
+    eventName: event.name,
+    eventDate: event.date,
+    qrCode: event.qrCode,
+    hasFaceRecognition: !!faceEmbedding
+  }, 'Registration successful', 201);
+});
 
-// POST - Register for an event
-// POST - Register for an event
-exports.registerForEvent = async (req, res) => {
-  try {
-    const { eventId, name, email, phone } = req.body;
-    const selfieFile = req.file; // Uploaded selfie (if using multer)
-
-    console.log('📝 Registration attempt:', { eventId, name, email });
-
-    // Validate required fields
-    if (!eventId || !name || !email || !phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields'
-      });
-    }
-
-    // ✅ FIX: Check if event exists - handle both ObjectId and QR code
-    let event;
-    
-    // Try to find by _id if it looks like an ObjectId (24 hex characters)
-    if (eventId.match(/^[0-9a-fA-F]{24}$/)) {
-      console.log('🔍 Looking up event by ObjectId:', eventId);
-      event = await Event.findById(eventId);
-    }
-    
-    // If not found, try to find by QR code
-    if (!event) {
-      console.log('🔍 Looking up event by QR code:', eventId);
-      event = await Event.findOne({ qrCode: eventId });
-    }
-
-    if (!event) {
-      console.error('❌ Event not found:', eventId);
-      return res.status(404).json({
-        success: false,
-        message: 'Event not found. Please check the event code.'
-      });
-    }
-
-    console.log('✅ Event found:', event._id, '-', event.name);
-
-    // ✅ FIX: Use the actual MongoDB _id for duplicate check
-    const existingRegistration = await Registration.findOne({
-      eventId: event._id.toString(), // Use MongoDB _id
-      email: email.toLowerCase()
-    });
-
-    if (existingRegistration) {
-      return res.status(400).json({
-        success: false,
-        message: 'Already registered for this event'
-      });
-    }
-
-    // Create registration object with actual MongoDB _id
-    const registrationData = {
-      eventId: event._id.toString(), // ✅ Use MongoDB _id, not QR code
-      name,
-      email: email.toLowerCase(),
-      phone
-    };
-
-    // FACE RECOGNITION: Extract embedding if selfie provided
-    if (selfieFile) {
-      try {
-        console.log('📸 Processing selfie for face recognition...');
-        
-        const selfiePath = selfieFile.path;
-        registrationData.selfieUrl = `/uploads/faces/${selfieFile.filename}`;
-
-        // Extract face embedding
-        const faceResult = await faceService.extractFaces(selfiePath);
-
-        if (faceResult.facesDetected === 0) {
-          // No face detected - still allow registration but warn
-          console.warn('⚠️  No face detected in selfie');
-          registrationData.faceProcessed = false;
-        } else if (faceResult.facesDetected > 1) {
-          // Multiple faces - use first one but warn
-          console.warn(`⚠️  Multiple faces detected (${faceResult.facesDetected}), using first one`);
-          registrationData.faceEmbedding = faceResult.faces[0].embedding;
-          registrationData.faceProcessed = true;
-        } else {
-          // Perfect - single face detected
-          console.log('✅ Face detected successfully');
-          registrationData.faceEmbedding = faceResult.faces[0].embedding;
-          registrationData.faceProcessed = true;
-        }
-
-        console.log(`⏱️  Face processing took ${faceResult.processingTime}s`);
-      } catch (faceError) {
-        // Face recognition failed - still allow registration
-        console.error('❌ Face recognition error:', faceError.message);
-        registrationData.faceProcessed = false;
-      }
-    }
-
-    // Create registration
-    const registration = new Registration(registrationData);
-    await registration.save();
-
-    // Generate QR code
-    const qrCode = await generateQRCode(event._id.toString(), registration._id.toString());
-    registration.qrCode = qrCode;
-    await registration.save();
-
-    console.log('✅ Registration created:', registration._id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Registration successful',
-      data: {
-        registrationId: registration._id,
-        name: registration.name,
-        email: registration.email,
-        eventName: event.name,
-        eventDate: event.date,
-        qrCode: registration.qrCode,
-        faceProcessed: registration.faceProcessed || false,
-        selfieUrl: registration.selfieUrl
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Registration failed',
-      error: error.message
-    });
+/**
+ * @desc    Get all registrations for an event
+ * @route   GET /api/registrations/event/:eventId
+ * @access  Public (will be protected in Phase 3)
+ */
+exports.getEventRegistrations = asyncHandler(async (req, res, next) => {
+  const { eventId } = req.params;
+  const { page = 1, limit = 50 } = req.query;
+  
+  // Verify event exists
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    throw new AppError('Event not found', 404);
   }
-};
-
-
-// GET - Get all registrations for an event
-exports.getEventRegistrations = async (req, res) => {
-  try {
-    const { eventId } = req.params;
-
-    const registrations = await Registration.find({ eventId })
-      .select('-faceEmbedding') // Don't send embeddings to frontend
-      .sort({ registeredAt: -1 });
-
-    res.json({
-      success: true,
-      count: registrations.length,
-      data: registrations
-    });
-
-  } catch (error) {
-    console.error('Get registrations error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch registrations',
-      error: error.message
-    });
-  }
-};
-
-// GET - Get single registration by ID
-exports.getRegistration = async (req, res) => {
-  try {
-    const { registrationId } = req.params;
-
-    const registration = await Registration.findById(registrationId)
-      .select('-faceEmbedding'); // Don't send embedding to frontend
-
-    if (!registration) {
-      return res.status(404).json({
-        success: false,
-        message: 'Registration not found'
-      });
+  
+  // Get registrations
+  const skip = (page - 1) * limit;
+  const registrations = await Registration.find({ eventId })
+    .select('-faceEmbedding') // Don't send face embeddings
+    .sort('-createdAt')
+    .limit(parseInt(limit))
+    .skip(skip);
+  
+  const total = await Registration.countDocuments({ eventId });
+  
+  successResponse(res, {
+    registrations,
+    pagination: {
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      limit: parseInt(limit)
     }
+  }, 'Registrations retrieved successfully');
+});
 
-    res.json({
-      success: true,
-      data: registration
-    });
-
-  } catch (error) {
-    console.error('Get registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch registration',
-      error: error.message
-    });
+/**
+ * @desc    Get single registration by ID
+ * @route   GET /api/registrations/:id
+ * @access  Public
+ */
+exports.getRegistrationById = asyncHandler(async (req, res, next) => {
+  const registration = await Registration.findById(req.params.id)
+    .select('-faceEmbedding');
+  
+  if (!registration) {
+    throw new AppError('Registration not found', 404);
   }
-};
-
-// DELETE - Delete registration
-exports.deleteRegistration = async (req, res) => {
-  try {
-    const { registrationId } = req.params;
-
-    const registration = await Registration.findByIdAndDelete(registrationId);
-
-    if (!registration) {
-      return res.status(404).json({
-        success: false,
-        message: 'Registration not found'
-      });
+  
+  // Get event details
+  const event = await Event.findById(registration.eventId);
+  
+  successResponse(res, {
+    registration,
+    event: {
+      id: event._id,
+      name: event.name,
+      date: event.date,
+      location: event.location
     }
+  }, 'Registration retrieved successfully');
+});
 
-    res.json({
-      success: true,
-      message: 'Registration deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Delete registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete registration',
-      error: error.message
-    });
+/**
+ * @desc    Update registration
+ * @route   PUT /api/registrations/:id
+ * @access  Public (with email verification in future)
+ */
+exports.updateRegistration = asyncHandler(async (req, res, next) => {
+  const { name, phone } = req.body;
+  
+  const registration = await Registration.findById(req.params.id);
+  
+  if (!registration) {
+    throw new AppError('Registration not found', 404);
   }
-};
+  
+  // Update allowed fields
+  if (name) registration.name = name;
+  if (phone) registration.phone = phone;
+  
+  await registration.save();
+  
+  logger.info('Registration updated', {
+    registrationId: registration._id,
+    updatedFields: Object.keys(req.body)
+  });
+  
+  successResponse(res, registration, 'Registration updated successfully');
+});
+
+/**
+ * @desc    Delete registration
+ * @route   DELETE /api/registrations/:id
+ * @access  Public (with email verification in future)
+ */
+exports.deleteRegistration = asyncHandler(async (req, res, next) => {
+  const registration = await Registration.findById(req.params.id);
+  
+  if (!registration) {
+    throw new AppError('Registration not found', 404);
+  }
+  
+  const eventId = registration.eventId;
+  
+  // Delete selfie file if exists
+  if (registration.selfiePath) {
+    const fs = require('fs').promises;
+    await fs.unlink(registration.selfiePath).catch(() => {});
+  }
+  
+  await registration.deleteOne();
+  
+  // Decrement event registration count
+  const event = await Event.findById(eventId);
+  if (event) {
+    event.registrationCount = Math.max(0, event.registrationCount - 1);
+    await event.save();
+  }
+  
+  logger.info('Registration deleted', {
+    registrationId: registration._id,
+    eventId
+  });
+  
+  successResponse(res, null, 'Registration deleted successfully');
+});

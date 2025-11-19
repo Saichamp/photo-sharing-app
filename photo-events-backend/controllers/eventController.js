@@ -1,136 +1,232 @@
+/**
+ * Event Controller for PhotoManEa
+ * Handles event CRUD operations with user-based filtering
+ */
+
 const Event = require('../models/Event');
+const User = require('../models/User');
+const { AppError, asyncHandler, successResponse } = require('../middleware/errorHandler');
+const { logDatabase, logger } = require('../utils/logger');
+const { generateQRCode } = require('../utils/helpers');
 
-// Create new event
-const createEvent = async (req, res) => {
-  try {
-    const { name, date, description, expectedGuests, organizerEmail, location } = req.body;
-    
-    console.log('🎉 Creating new event:', { name, date, organizerEmail });
+/**
+ * @desc    Create new event
+ * @route   POST /api/events
+ * @access  Private
+ */
+exports.createEvent = asyncHandler(async (req, res, next) => {
+  const { name, date, description, location, expectedGuests } = req.body;
+  
+  // Generate unique QR code
+  const qrCode = generateQRCode(name);
+  
+  // Create event with userId
+  const event = await Event.create({
+    userId: req.user._id,
+    name,
+    date,
+    description,
+    location,
+    expectedGuests,
+    qrCode,
+    organizerEmail: req.user.email
+  });
+  
+  // Increment user's event usage
+  await req.user.incrementEventUsage();
+  
+  logDatabase('CREATE', 'events', {
+    eventId: event._id,
+    userId: req.user._id,
+    eventName: name
+  });
+  
+  logger.info('Event created', {
+    eventId: event._id,
+    userId: req.user._id,
+    eventName: name
+  });
+  
+  successResponse(res, {
+    id: event._id,
+    name: event.name,
+    date: event.date,
+    qrCode: event.qrCode,
+    status: event.status,
+    expectedGuests: event.expectedGuests
+  }, 'Event created successfully', 201);
+});
 
-    // Generate unique QR code
-    const qrCode = `event-${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
-
-    // Create event
-    const event = new Event({
-      name,
-      date,
-      description,
-      location: location || 'Not specified',
-      expectedGuests,
-      qrCode,
-      organizerEmail,
-      status: new Date(date) > new Date() ? 'upcoming' : 'active'
-    });
-
-    await event.save();
-
-    console.log('✅ Event saved to database:', event._id);
-    console.log('📋 QR Code generated:', qrCode);
-
-    res.status(201).json({
-      success: true,
-      message: 'Event created successfully!',
-      data: {
-        _id: event._id,
-        name: event.name,
-        date: event.date,
-        location: event.location,
-        qrCode: event.qrCode,
-        registrationUrl: `${req.protocol}://${req.get('host')}/register/${event.qrCode}`
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Create event error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to create event',
-      message: error.message 
-    });
+/**
+ * @desc    Get all events for logged-in user
+ * @route   GET /api/events
+ * @access  Private
+ */
+exports.getEvents = asyncHandler(async (req, res, next) => {
+  const { status, sort = '-createdAt', page = 1, limit = 20 } = req.query;
+  
+  // Build query - only user's events
+  const query = { userId: req.user._id };
+  
+  if (status) {
+    query.status = status;
   }
-}; // <-- FIXED: Added closing brace
-
-// Get all events
-const getAllEvents = async (req, res) => {
-  try {
-    const events = await Event.find()
-      .select('name date location status registrationCount photosUploaded qrCode createdAt')
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: events.length,
-      data: events
-    });
-
-  } catch (error) {
-    console.error('❌ Get events error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch events' 
-    });
-  }
-};
-
-// Get single event
-const getEvent = async (req, res) => {
-  try {
-    const { qrCode } = req.params;
-    
-    const event = await Event.findOne({ qrCode });
-
-    if (!event) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Event not found' 
-      });
+  
+  // Pagination
+  const skip = (page - 1) * limit;
+  
+  // Get events
+  const events = await Event.find(query)
+    .sort(sort)
+    .limit(parseInt(limit))
+    .skip(skip);
+  
+  // Get total count
+  const total = await Event.countDocuments(query);
+  
+  logDatabase('READ', 'events', {
+    userId: req.user._id,
+    count: events.length
+  });
+  
+  successResponse(res, {
+    events,
+    pagination: {
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      limit: parseInt(limit)
     }
+  }, 'Events retrieved successfully');
+});
 
-    res.json({
-      success: true,
-      data: event
-    });
+/**
+ * @desc    Get single event by ID
+ * @route   GET /api/events/:id
+ * @access  Private
+ */
+exports.getEventById = asyncHandler(async (req, res, next) => {
+  // Event already loaded by verifyOwnership middleware
+  const event = req.resource;
+  
+  logDatabase('READ', 'events', {
+    eventId: event._id,
+    userId: req.user._id
+  });
+  
+  successResponse(res, event, 'Event retrieved successfully');
+});
 
-  } catch (error) {
-    console.error('❌ Get event error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch event' 
-    });
+/**
+ * @desc    Update event
+ * @route   PUT /api/events/:id
+ * @access  Private
+ */
+exports.updateEvent = asyncHandler(async (req, res, next) => {
+  const { name, date, description, location, expectedGuests, settings } = req.body;
+  
+  // Event already loaded by verifyOwnership middleware
+  const event = req.resource;
+  
+  // Update fields
+  if (name) event.name = name;
+  if (date) event.date = date;
+  if (description !== undefined) event.description = description;
+  if (location) event.location = location;
+  if (expectedGuests) event.expectedGuests = expectedGuests;
+  if (settings) event.settings = { ...event.settings, ...settings };
+  
+  await event.save();
+  
+  logDatabase('UPDATE', 'events', {
+    eventId: event._id,
+    userId: req.user._id,
+    updatedFields: Object.keys(req.body)
+  });
+  
+  logger.info('Event updated', {
+    eventId: event._id,
+    userId: req.user._id
+  });
+  
+  successResponse(res, event, 'Event updated successfully');
+});
+
+/**
+ * @desc    Delete event
+ * @route   DELETE /api/events/:id
+ * @access  Private
+ */
+exports.deleteEvent = asyncHandler(async (req, res, next) => {
+  // Event already loaded by verifyOwnership middleware
+  const event = req.resource;
+  
+  await event.deleteOne();
+  
+  // Decrement user's event usage
+  req.user.quota.eventsUsed = Math.max(0, req.user.quota.eventsUsed - 1);
+  await req.user.save();
+  
+  logDatabase('DELETE', 'events', {
+    eventId: event._id,
+    userId: req.user._id
+  });
+  
+  logger.warn('Event deleted', {
+    eventId: event._id,
+    userId: req.user._id,
+    eventName: event.name
+  });
+  
+  successResponse(res, null, 'Event deleted successfully');
+});
+
+/**
+ * @desc    Get event statistics
+ * @route   GET /api/events/:id/stats
+ * @access  Private
+ */
+exports.getEventStats = asyncHandler(async (req, res, next) => {
+  const event = req.resource;
+  
+  // You can add more stats here later
+  const stats = {
+    eventId: event._id,
+    eventName: event.name,
+    status: event.status,
+    registrations: event.registrationCount,
+    expectedGuests: event.expectedGuests,
+    registrationProgress: Math.round((event.registrationCount / event.expectedGuests) * 100),
+    photosUploaded: event.photosUploaded,
+    storageUsed: event.storageUsedMB + ' MB',
+    createdAt: event.createdAt,
+    isPast: event.isPast
+  };
+  
+  successResponse(res, stats, 'Event statistics retrieved successfully');
+});
+
+/**
+ * @desc    Get event by QR code (for guest registration)
+ * @route   GET /api/events/qr/:qrCode
+ * @access  Public
+ */
+exports.getEventByQRCode = asyncHandler(async (req, res, next) => {
+  const { qrCode } = req.params;
+  
+  const event = await Event.findOne({ qrCode });
+  
+  if (!event) {
+    throw new AppError('Event not found', 404);
   }
-};
-
-// Get event by ID
-const getEventById = async (req, res) => {
-  try {
-    const { eventId } = req.params;
-    
-    const event = await Event.findById(eventId);
-
-    if (!event) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Event not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      data: event
-    });
-
-  } catch (error) {
-    console.error('❌ Get event by ID error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch event' 
-    });
-  }
-};
-
-module.exports = {
-  createEvent,
-  getAllEvents,
-  getEvent,
-  getEventById
-};
+  
+  // Return limited info for public access
+  successResponse(res, {
+    id: event._id,
+    name: event.name,
+    date: event.date,
+    location: event.location,
+    organizerEmail: event.organizerEmail,
+    qrCode: event.qrCode
+  }, 'Event retrieved successfully');
+});

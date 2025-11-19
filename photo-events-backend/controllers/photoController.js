@@ -1,321 +1,380 @@
+/**
+ * Photo Controller for PhotoManEa
+ * Handles photo upload and management with access control
+ */
+
 const Photo = require('../models/Photo');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
-const faceService = require('../services/faceRecognitionService');
+const { AppError, asyncHandler, successResponse } = require('../middleware/errorHandler');
+const { logFile, logAI, logger } = require('../utils/logger');
+const faceRecognitionService = require('../services/faceRecognitionService');
 const path = require('path');
 const fs = require('fs').promises;
 
 /**
- * Upload photos for an event
- * POST /api/photos/upload
+ * @desc    Upload photos to an event
+ * @route   POST /api/photos/upload
+ * @access  Private
  */
-const uploadPhotos = async (req, res) => {
-  try {
-    const { eventId } = req.body;
-    const uploadedFiles = req.files; // Array of files from multer
-
-    if (!eventId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Event ID is required'
-      });
-    }
-
-    if (!uploadedFiles || uploadedFiles.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No photos uploaded'
-      });
-    }
-
-    // Verify event exists
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event not found'
-      });
-    }
-
-    console.log(`📸 Uploading ${uploadedFiles.length} photos for event ${eventId}`);
-
-    // Save photo records to database (process faces in background)
-    const photoRecords = [];
-
-    for (const file of uploadedFiles) {
-      const photo = new Photo({
-        eventId,
-        filename: file.filename,
-        url: `/uploads/photos/${file.filename}`,
-        processed: false // Will be processed in background
-      });
-
-      await photo.save();
-      photoRecords.push(photo);
-
-      // Process face detection in background (don't wait)
-      processFacesInBackground(photo._id, file.path);
-    }
-
-    // Update event photo count
-    event.photosUploaded = (event.photosUploaded || 0) + uploadedFiles.length;
-    await event.save();
-
-    res.status(201).json({
-      success: true,
-      message: `${uploadedFiles.length} photos uploaded successfully`,
-      data: {
-        eventId,
-        photosUploaded: uploadedFiles.length,
-        photos: photoRecords.map(p => ({
-          id: p._id,
-          url: p.url,
-          processed: p.processed
-        }))
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Photo upload error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to upload photos',
-      error: error.message
-    });
+exports.uploadPhotos = asyncHandler(async (req, res, next) => {
+  const { eventId } = req.body;
+  
+  if (!eventId) {
+    throw new AppError('Event ID is required', 400);
   }
-};
+  
+  if (!req.files || req.files.length === 0) {
+    throw new AppError('No photos uploaded', 400);
+  }
+  
+  // Verify event exists and user owns it
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+  
+  if (event.userId.toString() !== req.user._id.toString()) {
+    throw new AppError('You do not have permission to upload photos to this event', 403);
+  }
+  
+  // Calculate total file size
+  const totalSize = req.files.reduce((sum, file) => sum + file.size, 0);
+  
+  // Check storage quota
+  if (!req.user.hasStorageSpace(totalSize)) {
+    // Delete uploaded files
+    await Promise.all(req.files.map(file => fs.unlink(file.path).catch(() => {})));
+    throw new AppError('Storage limit exceeded. Please upgrade your plan.', 403);
+  }
+  
+  // Create photo records
+  const photoPromises = req.files.map(async (file) => {
+    const photo = await Photo.create({
+      eventId,
+      filename: file.filename,
+      originalName: file.originalname,
+      path: file.path,
+      size: file.size,
+      mimetype: file.mimetype
+    });
+    
+    logFile('upload', file.filename, {
+      photoId: photo._id,
+      eventId,
+      size: file.size
+    });
+    
+    // Trigger background face processing
+    processPhotoInBackground(photo._id, file.path);
+    
+    return photo;
+  });
+  
+  const photos = await Promise.all(photoPromises);
+  
+  // Update event statistics
+  await event.incrementPhotoStats(totalSize);
+  
+  // Update user storage
+  await req.user.incrementStorageUsage(totalSize);
+  
+  logger.info('Photos uploaded', {
+    userId: req.user._id,
+    eventId,
+    count: photos.length,
+    totalSize
+  });
+  
+  successResponse(res, {
+    uploaded: photos.length,
+    photos: photos.map(p => ({
+      id: p._id,
+      filename: p.filename,
+      size: p.size
+    }))
+  }, 'Photos uploaded successfully', 201);
+});
 
 /**
- * Background job to process faces in photo
+ * @desc    Get all photos for an event
+ * @route   GET /api/photos/event/:eventId
+ * @access  Private or Public with registration
  */
-async function processFacesInBackground(photoId, filePath) {
-  try {
-    console.log(`🔍 Processing faces for photo ${photoId}...`);
-    
-    const startTime = Date.now();
-
-    // Extract faces using Python service
-    const result = await faceService.extractFaces(filePath);
-
-    const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
-
-    // Update photo record with face data
-    const photo = await Photo.findById(photoId);
-    
-    if (!photo) {
-      console.error(`❌ Photo ${photoId} not found in database`);
-      return;
+exports.getEventPhotos = asyncHandler(async (req, res, next) => {
+  const { eventId } = req.params;
+  const { page = 1, limit = 50 } = req.query;
+  
+  // Verify event exists
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+  
+  // Check access:
+  // 1. Event owner (authenticated user)
+  // 2. Registered guest (check registration)
+  let hasAccess = false;
+  
+  if (req.user && event.userId.toString() === req.user._id.toString()) {
+    hasAccess = true; // Event owner
+  }
+  
+  // For guests, we'll verify registration in face-matching route
+  // For now, allow public access (we'll restrict in Phase 3)
+  hasAccess = true;
+  
+  // Get photos
+  const skip = (page - 1) * limit;
+  const photos = await Photo.find({ eventId, processed: true })
+    .select('-faces') // Don't send face embeddings
+    .sort('-uploadedAt')
+    .limit(parseInt(limit))
+    .skip(skip);
+  
+  const total = await Photo.countDocuments({ eventId, processed: true });
+  
+  successResponse(res, {
+    photos,
+    pagination: {
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      limit: parseInt(limit)
     }
+  }, 'Photos retrieved successfully');
+});
 
-    photo.faces = result.faces;
-    photo.processed = true;
-    await photo.save();
+/**
+ * @desc    Get single photo by ID
+ * @route   GET /api/photos/:id
+ * @access  Private or Public
+ */
+exports.getPhotoById = asyncHandler(async (req, res, next) => {
+  const photo = await Photo.findById(req.params.id).select('-faces');
+  
+  if (!photo) {
+    throw new AppError('Photo not found', 404);
+  }
+  
+  // Verify access
+  const event = await Event.findById(photo.eventId);
+  
+  if (!event) {
+    throw new AppError('Associated event not found', 404);
+  }
+  
+  // Check if user owns the event
+  if (req.user && event.userId.toString() === req.user._id.toString()) {
+    // Owner has full access
+    successResponse(res, photo, 'Photo retrieved successfully');
+  } else {
+    // Public access - limited info
+    successResponse(res, {
+      id: photo._id,
+      filename: photo.filename,
+      path: photo.path,
+      uploadedAt: photo.uploadedAt
+    }, 'Photo retrieved successfully');
+  }
+});
 
-    console.log(`✅ Photo ${photoId} processed: ${result.facesDetected} face(s) in ${processingTime}s`);
-
+/**
+ * @desc    Delete photo
+ * @route   DELETE /api/photos/:id
+ * @access  Private
+ */
+exports.deletePhoto = asyncHandler(async (req, res, next) => {
+  const photo = await Photo.findById(req.params.id);
+  
+  if (!photo) {
+    throw new AppError('Photo not found', 404);
+  }
+  
+  // Verify event ownership
+  const event = await Event.findById(photo.eventId);
+  
+  if (!event) {
+    throw new AppError('Associated event not found', 404);
+  }
+  
+  if (event.userId.toString() !== req.user._id.toString()) {
+    throw new AppError('You do not have permission to delete this photo', 403);
+  }
+  
+  // Delete file from disk
+  try {
+    await fs.unlink(photo.path);
+    logFile('delete', photo.filename, { photoId: photo._id });
   } catch (error) {
-    console.error(`❌ Face processing failed for photo ${photoId}:`, error.message);
+    logger.error('Failed to delete photo file', { photoId: photo._id, error: error.message });
+  }
+  
+  // Update event statistics
+  event.photosUploaded = Math.max(0, event.photosUploaded - 1);
+  event.storageUsed = Math.max(0, event.storageUsed - photo.size);
+  await event.save();
+  
+  // Update user storage
+  req.user.quota.storageUsed = Math.max(0, req.user.quota.storageUsed - photo.size);
+  await req.user.save();
+  
+  // Delete photo record
+  await photo.deleteOne();
+  
+  logger.info('Photo deleted', {
+    userId: req.user._id,
+    photoId: photo._id,
+    eventId: event._id
+  });
+  
+  successResponse(res, null, 'Photo deleted successfully');
+});
+
+/**
+ * @desc    Manually trigger face processing
+ * @route   POST /api/photos/process/:photoId
+ * @access  Private
+ */
+exports.processPhotoFaces = asyncHandler(async (req, res, next) => {
+  const photo = await Photo.findById(req.params.photoId);
+  
+  if (!photo) {
+    throw new AppError('Photo not found', 404);
+  }
+  
+  // Verify ownership
+  const event = await Event.findById(photo.eventId);
+  
+  if (!event || event.userId.toString() !== req.user._id.toString()) {
+    throw new AppError('You do not have permission to process this photo', 403);
+  }
+  
+  // Process faces
+  try {
+    const result = await faceRecognitionService.extractFaces(photo.path);
     
-    // Mark as processed with error
-    try {
+    if (result.success && result.facesDetected > 0) {
+      photo.faces = result.faces;
+      photo.processed = true;
+      await photo.save();
+      
+      logAI('face-extraction', {
+        photoId: photo._id,
+        facesDetected: result.facesDetected
+      });
+      
+      successResponse(res, {
+        photoId: photo._id,
+        facesDetected: result.facesDetected,
+        processingTime: result.processingTime
+      }, 'Photo processed successfully');
+    } else {
+      photo.processed = true;
+      photo.processingError = 'No faces detected';
+      await photo.save();
+      
+      successResponse(res, {
+        photoId: photo._id,
+        facesDetected: 0,
+        message: 'No faces detected in photo'
+      }, 'Photo processed (no faces found)');
+    }
+  } catch (error) {
+    photo.processed = true;
+    photo.processingError = error.message;
+    await photo.save();
+    
+    throw new AppError('Face processing failed: ' + error.message, 500);
+  }
+});
+
+/**
+ * @desc    Get photo statistics for an event
+ * @route   GET /api/photos/event/:eventId/stats
+ * @access  Private
+ */
+exports.getPhotoStats = asyncHandler(async (req, res, next) => {
+  const { eventId } = req.params;
+  
+  // Verify ownership
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+  
+  if (event.userId.toString() !== req.user._id.toString()) {
+    throw new AppError('You do not have permission to view these statistics', 403);
+  }
+  
+  // Get statistics
+  const totalPhotos = await Photo.countDocuments({ eventId });
+  const processedPhotos = await Photo.countDocuments({ eventId, processed: true });
+  const photosWithFaces = await Photo.countDocuments({ 
+    eventId, 
+    processed: true,
+    'faces.0': { $exists: true }
+  });
+  
+  // Calculate total faces
+  const faceAggregation = await Photo.aggregate([
+    { $match: { eventId: event._id, processed: true } },
+    { $project: { faceCount: { $size: { $ifNull: ['$faces', []] } } } },
+    { $group: { _id: null, totalFaces: { $sum: '$faceCount' } } }
+  ]);
+  
+  const totalFaces = faceAggregation.length > 0 ? faceAggregation[0].totalFaces : 0;
+  
+  const stats = {
+    eventId: event._id,
+    eventName: event.name,
+    totalPhotos,
+    processedPhotos,
+    photosWithFaces,
+    totalFaces,
+    storageUsed: event.storageUsedMB + ' MB',
+    processingProgress: totalPhotos > 0 ? Math.round((processedPhotos / totalPhotos) * 100) : 0
+  };
+  
+  successResponse(res, stats, 'Photo statistics retrieved successfully');
+});
+
+/**
+ * Background face processing function
+ */
+async function processPhotoInBackground(photoId, photoPath) {
+  try {
+    const result = await faceRecognitionService.extractFaces(photoPath);
+    
+    if (result.success && result.facesDetected > 0) {
+      await Photo.findByIdAndUpdate(photoId, {
+        faces: result.faces,
+        processed: true
+      });
+      
+      logAI('face-extraction-background', {
+        photoId,
+        facesDetected: result.facesDetected,
+        processingTime: result.processingTime
+      });
+    } else {
       await Photo.findByIdAndUpdate(photoId, {
         processed: true,
-        processingError: error.message
+        processingError: 'No faces detected'
       });
-    } catch (updateError) {
-      console.error('Failed to update photo with error:', updateError);
     }
+  } catch (error) {
+    logger.error('Background face processing failed', {
+      photoId,
+      error: error.message
+    });
+    
+    await Photo.findByIdAndUpdate(photoId, {
+      processed: true,
+      processingError: error.message
+    });
   }
 }
-
-/**
- * Get all photos for an event
- * GET /api/photos/event/:eventId
- */
-const getEventPhotos = async (req, res) => {
-  try {
-    const { eventId } = req.params;
-
-    const photos = await Photo.find({ eventId })
-      .select('-faces.embedding') // Don't send embeddings to frontend
-      .sort({ uploadedAt: -1 });
-
-    res.json({
-      success: true,
-      count: photos.length,
-      data: photos.map(p => ({
-        id: p._id,
-        url: p.url,
-        processed: p.processed,
-        facesDetected: p.faces ? p.faces.length : 0,
-        uploadedAt: p.uploadedAt
-      }))
-    });
-
-  } catch (error) {
-    console.error('❌ Get photos error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch photos',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Get processing status
- * GET /api/photos/status/:eventId
- */
-const getProcessingStatus = async (req, res) => {
-  try {
-    const { eventId } = req.params;
-
-    const totalPhotos = await Photo.countDocuments({ eventId });
-    const processedPhotos = await Photo.countDocuments({ eventId, processed: true });
-    const photosWithFaces = await Photo.countDocuments({ 
-      eventId, 
-      processed: true,
-      'faces.0': { $exists: true }
-    });
-
-    res.json({
-      success: true,
-      data: {
-        totalPhotos,
-        processedPhotos,
-        pendingPhotos: totalPhotos - processedPhotos,
-        photosWithFaces,
-        processingComplete: totalPhotos === processedPhotos
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Get status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get processing status',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Search for user's photos
- * POST /api/photos/search
- */
-const searchUserPhotos = async (req, res) => {
-  try {
-    const { registrationId, eventId, threshold } = req.body;
-
-    if (!registrationId || !eventId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Registration ID and Event ID are required'
-      });
-    }
-
-    console.log(`🔍 Searching photos for registration ${registrationId}...`);
-
-    // Get user's face embedding
-    const registration = await Registration.findById(registrationId);
-
-    if (!registration) {
-      return res.status(404).json({
-        success: false,
-        message: 'Registration not found'
-      });
-    }
-
-    if (!registration.faceEmbedding || !registration.faceProcessed) {
-      return res.status(400).json({
-        success: false,
-        message: 'No face embedding found for this registration'
-      });
-    }
-
-    // Get all processed photos for the event
-    const photos = await Photo.find({
-      eventId,
-      processed: true,
-      'faces.0': { $exists: true } // Photos with at least one face
-    });
-
-    console.log(`📸 Searching ${photos.length} photos with faces...`);
-
-    // Build database of all face embeddings from photos
-    const faceDatabase = [];
-    for (const photo of photos) {
-      for (const face of photo.faces) {
-        faceDatabase.push({
-          photoId: photo._id.toString(),
-          faceIndex: face.faceIndex,
-          embedding: face.embedding,
-          boundingBox: face.boundingBox
-        });
-      }
-    }
-
-    console.log(`👤 Comparing against ${faceDatabase.length} total faces...`);
-
-    // Search for matches
-    const searchThreshold = threshold || 0.4;
-    const startTime = Date.now();
-
-    const matches = await faceService.searchFaces(
-      registration.faceEmbedding,
-      faceDatabase,
-      searchThreshold
-    );
-
-    const searchTime = ((Date.now() - startTime) / 1000).toFixed(2);
-
-    // Group matches by photo
-    const matchedPhotoIds = [...new Set(matches.matches.map(m => m.photoId))];
-    const matchedPhotos = await Photo.find({
-      _id: { $in: matchedPhotoIds }
-    }).select('-faces.embedding');
-
-    // Add match details to each photo
-    const results = matchedPhotos.map(photo => {
-      const photoMatches = matches.matches.filter(m => m.photoId === photo._id.toString());
-      return {
-        photoId: photo._id,
-        url: photo.url,
-        uploadedAt: photo.uploadedAt,
-        matches: photoMatches.map(m => ({
-          faceIndex: m.faceIndex,
-          confidence: m.confidence,
-          boundingBox: m.boundingBox
-        }))
-      };
-    });
-
-    console.log(`✅ Search complete: Found ${matchedPhotoIds.length} photos in ${searchTime}s`);
-
-    res.json({
-      success: true,
-      message: `Found ${matchedPhotoIds.length} photo(s) containing you`,
-      data: {
-        totalPhotosSearched: photos.length,
-        totalFacesSearched: faceDatabase.length,
-        matchesFound: matchedPhotoIds.length,
-        searchTime: parseFloat(searchTime),
-        photos: results
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Photo search error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to search photos',
-      error: error.message
-    });
-  }
-};
-
-// Export all functions
-exports.uploadPhotos = uploadPhotos;
-exports.getEventPhotos = getEventPhotos;
-exports.getProcessingStatus = getProcessingStatus;
-exports.searchUserPhotos = searchUserPhotos;
