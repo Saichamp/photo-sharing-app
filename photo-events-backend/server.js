@@ -68,7 +68,8 @@ app.get('/api/status', (req, res) => {
     services: {
       api: 'active',
       faceRecognition: 'active',
-      fileUpload: 'active'
+      fileUpload: 'active',
+      authentication: 'active'
     }
   });
 });
@@ -79,6 +80,10 @@ app.get('/api/status', (req, res) => {
 logger.info('📡 Loading API routes...');
 
 try {
+  // Auth routes (AUTHENTICATION SYSTEM - NEW!)
+  app.use('/api/auth', require('./routes/auth'));
+  logger.info('  ✅ Auth routes loaded');
+  
   // Events routes
   app.use('/api/events', require('./routes/events'));
   logger.info('  ✅ Events routes loaded');
@@ -138,14 +143,31 @@ const startServer = async () => {
       console.log(`🎯 Frontend URL: ${config.server.frontendUrl}`);
       console.log('');
       console.log('📡 Available Endpoints:');
-      console.log('   GET  /api/health           - Health check');
-      console.log('   GET  /api/status           - System status');
-      console.log('   POST /api/events           - Create event');
-      console.log('   GET  /api/events           - List events');
-      console.log('   POST /api/registrations    - Guest registration');
-      console.log('   POST /api/photos/upload    - Upload photos');
-      console.log('   POST /api/face-matching    - Face matching');
+      console.log('   ── SYSTEM ──');
+      console.log('   GET  /api/health              - Health check');
+      console.log('   GET  /api/status              - System status');
+      console.log('');
+      console.log('   ── AUTHENTICATION (NEW!) ──');
+      console.log('   POST /api/auth/register       - Organizer signup');
+      console.log('   POST /api/auth/login          - User login');
+      console.log('   GET  /api/auth/me             - Get profile (protected)');
+      console.log('   PUT  /api/auth/update-profile - Update profile (protected)');
+      console.log('   PUT  /api/auth/change-password- Change password (protected)');
+      console.log('   POST /api/auth/logout         - Logout (protected)');
+      console.log('');
+      console.log('   ── EVENTS ──');
+      console.log('   POST /api/events              - Create event');
+      console.log('   GET  /api/events              - List events');
+      console.log('');
+      console.log('   ── GUESTS ──');
+      console.log('   POST /api/registrations       - Guest registration');
+      console.log('');
+      console.log('   ── PHOTOS ──');
+      console.log('   POST /api/photos/upload       - Upload photos');
+      console.log('   POST /api/face-matching       - Face matching');
       console.log('═══════════════════════════════════════════════════════');
+      console.log('');
+      console.log('🎉 Phase 1 Complete: Authentication System Active!');
       console.log('');
       
       logger.info(`Server started on ${HOST}:${PORT}`);
@@ -163,7 +185,6 @@ const startServer = async () => {
 // ============================================
 const gracefulShutdown = (signal) => {
   logger.info(`\n${signal} received. Starting graceful shutdown...`);
-  
   process.exit(0);
 };
 
