@@ -8,7 +8,7 @@ import { Loader } from './components/common/Loader';
 import { LoginPage } from './pages/Auth/LoginPage';
 import { RegisterPage } from './pages/Auth/RegisterPage';
 import LandingPage from './pages/LandingPage';
-import Dashboard from './pages/Dashboard';
+import DashboardPage from './pages/Dashboard/DashboardPage'; // ← UPDATED
 import MultiStepForm from './components/MultiStepForm';
 
 // Components
@@ -72,7 +72,7 @@ function AppRoutes() {
           path="/dashboard/*"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
