@@ -85,16 +85,18 @@ router.put(
   authController.changePassword
 );
 
+
 /**
  * @route   POST /api/auth/logout
  * @desc    Logout user (client-side token removal)
- * @access  Private
+ * @access  Public (no auth required)
  */
 router.post(
   '/logout',
-  authenticate,
+  // Remove authenticate middleware - make it public
   authController.logout
 );
+
 
 /**
  * @route   GET /api/auth/verify-token

@@ -318,12 +318,25 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
  * @desc    Logout user (client-side token removal)
  * @access  Private
  */
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Logout user (client-side token removal)
+ * @access  Private
+ */
 exports.logout = asyncHandler(async (req, res, next) => {
-  logAuth('logout', req.user.id);
-  logger.info('User logged out', { userId: req.user.id });
+  // Log if user is authenticated, otherwise anonymous logout
+  const userId = req.user?._id || req.user?.id || 'anonymous';
+  
+  if (userId !== 'anonymous') {
+    logAuth('logout', userId);
+    logger.info('User logged out', { userId });
+  } else {
+    logger.info('Anonymous logout attempt');
+  }
   
   successResponse(res, null, 'Logout successful');
 });
+
 
 /**
  * @route   GET /api/auth/verify-token
