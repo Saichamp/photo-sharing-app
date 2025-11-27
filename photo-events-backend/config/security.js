@@ -35,13 +35,13 @@ const helmetConfig = helmet({
 const corsConfig = cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = config.security.corsOrigin.split(',').map(o => o.trim());
-    
+
     if (config.server.env === 'development') {
       allowedOrigins.push('http://localhost:3000', 'http://127.0.0.1:3000');
     }
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
@@ -72,15 +72,18 @@ const generalLimiter = rateLimit({
 });
 
 /**
- * MongoDB Injection Protection
+ * MongoDB Injection Protection (Patched)
  */
 const sanitizeObject = (obj) => {
   if (obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(item => sanitizeObject(item));
-  
+  // Convert null-prototype objects to plain objects if needed
+  if (Object.getPrototypeOf(obj) === null) {
+    obj = Object.assign({}, obj);
+  }
   const sanitized = {};
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const sanitizedKey = key.replace(/[$\.]/g, '');
       sanitized[sanitizedKey] = sanitizeObject(obj[key]);
     }
@@ -96,7 +99,7 @@ const mongoSanitizeConfig = (req, res, next) => {
 };
 
 /**
- * XSS Protection
+ * XSS Protection (Patched)
  */
 const cleanXSS = (obj) => {
   if (obj === null || typeof obj !== 'object') {
@@ -109,12 +112,14 @@ const cleanXSS = (obj) => {
     }
     return obj;
   }
-  
   if (Array.isArray(obj)) return obj.map(item => cleanXSS(item));
-  
+  // Convert null-prototype objects to plain objects if needed
+  if (Object.getPrototypeOf(obj) === null) {
+    obj = Object.assign({}, obj);
+  }
   const cleaned = {};
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
       cleaned[key] = cleanXSS(obj[key]);
     }
   }
@@ -133,7 +138,6 @@ const xssConfig = (req, res, next) => {
  */
 const hppConfig = (req, res, next) => {
   const whitelist = ['eventId', 'status', 'sort', 'limit', 'page', 'faceMatchThreshold'];
-  
   if (req.query) {
     for (const key in req.query) {
       if (!whitelist.includes(key) && Array.isArray(req.query[key])) {
@@ -141,7 +145,6 @@ const hppConfig = (req, res, next) => {
       }
     }
   }
-  
   next();
 };
 
@@ -155,11 +158,9 @@ const securityHeaders = (req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  
   if (req.path.includes('/api/auth') || req.path.includes('/api/admin')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   }
-  
   next();
 };
 
@@ -185,7 +186,7 @@ const applySecurity = (app) => {
   app.use(hppConfig);
   app.use(securityHeaders);
   app.use('/api/', generalLimiter);
-  
+
   console.log('✅ Security middleware configured successfully');
 };
 

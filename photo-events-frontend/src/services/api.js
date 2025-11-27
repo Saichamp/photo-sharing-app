@@ -10,7 +10,7 @@ const api = axios.create({
   }
 });
 
-// Request interceptor: Add auth token
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -22,78 +22,74 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: Handle token expiration
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
         const refreshToken = localStorage.getItem('refreshToken');
         const { data } = await axios.post(
           `${API_BASE_URL}/auth/refresh-token`,
           { refreshToken }
         );
-
         localStorage.setItem('token', data.data.token);
         localStorage.setItem('refreshToken', data.data.refreshToken);
-
-        originalRequest.headers.Authorization = `Bearer ${data.data.token}`;
         return api(originalRequest);
       } catch (refreshError) {
-        localStorage.clear();
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
-
     return Promise.reject(error);
   }
 );
 
+// Auth API
+export const authAPI = {
+  login: (credentials) => api.post('/auth/login', credentials),
+  register: (userData) => api.post('/auth/register', userData),
+  logout: () => api.post('/auth/logout'),
+  refreshToken: (refreshToken) => api.post('/auth/refresh-token', { refreshToken })
+};
+
 // Event API
 export const eventAPI = {
-  create: (data) => api.post('/events', data),
-  getAll: (params) => api.get('/events', { params }),
+  getAll: () => api.get('/events'),
   getById: (id) => api.get(`/events/${id}`),
-  update: (id, data) => api.put(`/events/${id}`, data),
-  delete: (id) => api.delete(`/events/${id}`),
-  getStats: (id) => api.get(`/events/${id}/stats`),
-  getByQRCode: (qrCode) => api.get(`/events/qr/${qrCode}`)
+  getByQRCode: (qrCode) => api.get(`/events/qr/${qrCode}`),
+  create: (eventData) => api.post('/events', eventData),
+  update: (id, eventData) => api.put(`/events/${id}`, eventData),
+  delete: (id) => api.delete(`/events/${id}`)
 };
 
 // Registration API
 export const registrationAPI = {
-  register: (formData) => api.post('/registrations', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  getByEvent: (eventId, params) => api.get(`/registrations/event/${eventId}`, { params }),
-  getById: (id) => api.get(`/registrations/${id}`)
+  register: (formData) => {
+    return api.post('/registrations/register', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+  getByEvent: (eventId) => api.get(`/registrations/event/${eventId}`),
+  getByEmail: (email) => api.get(`/registrations/email/${email}`)
 };
-
-// Photo API
 export const photoAPI = {
-  upload: (formData, onProgress) => api.post('/photos/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    onUploadProgress: (progressEvent) => {
-      const percentCompleted = Math.round(
-        (progressEvent.loaded * 100) / progressEvent.total
-      );
-      if (onProgress) onProgress(percentCompleted);
-    }
-  }),
-  getByEvent: (eventId, params) => api.get(`/photos/event/${eventId}`, { params }),
-  getById: (id) => api.get(`/photos/${id}`),
-  delete: (id) => api.delete(`/photos/${id}`),
-  getStats: (eventId) => api.get(`/photos/event/${eventId}/stats`)
-};
-
-// Face Matching API
-export const faceMatchingAPI = {
-  findPhotos: (data) => api.post('/face-matching/find', data)
+  upload: (formData, config) => {
+    return api.post('/photos/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      ...config,
+    });
+  },
+  getByEvent: (eventId) => api.get(`/photos/event/${eventId}`),
+  getByRegistration: (registrationId) => api.get(`/photos/registration/${registrationId}`)
 };
 
 export default api;

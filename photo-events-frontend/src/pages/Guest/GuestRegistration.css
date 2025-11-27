@@ -1,0 +1,765 @@
+/* ============================================
+   MODERN GUEST REGISTRATION - PREMIUM DESIGN
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   MAIN WRAPPER & ANIMATED BACKGROUND
+   ============================================ */
+
+.registration-wrapper {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.animated-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.gradient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+  animation: float 20s infinite ease-in-out;
+}
+
+.orb-1 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
+  top: -10%;
+  left: -10%;
+  animation-delay: 0s;
+}
+
+.orb-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+  bottom: -5%;
+  right: -5%;
+  animation-delay: 7s;
+}
+
+.orb-3 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, #ec4899 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation-delay: 14s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -30px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+/* ============================================
+   CONTENT CONTAINER
+   ============================================ */
+
+.registration-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 700px;
+  animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+
+.reg-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.logo-circle {
+  width: 48px;
+  height: 48px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.logo span {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.event-badge {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 1.25rem 2rem;
+  color: white;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+.event-badge h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.event-badge p {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+
+.progress-wrapper {
+  margin-bottom: 2rem;
+}
+
+.progress-line {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-active {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+}
+
+.progress-dots {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+}
+
+.dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dot span {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.dot.active span {
+  background: white;
+  color: #667eea;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+}
+
+.dot label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dot.active label {
+  color: white;
+}
+
+/* ============================================
+   MAIN CARD
+   ============================================ */
+
+.reg-card {
+  background: white;
+  border-radius: 24px;
+  padding: 3rem;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.step-content {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step-content h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #64748b;
+  font-size: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* ============================================
+   FORM INPUTS
+   ============================================ */
+
+.form-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.input-group label {
+  display: block;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  color: #1e293b;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+  font-family: inherit;
+}
+
+.input-group input:hover {
+  border-color: #cbd5e1;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.input-group input.error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.error-msg {
+  display: block;
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+/* ============================================
+   INFO BOX
+   ============================================ */
+
+.info-box {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+}
+
+.info-box.success {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border-color: #6ee7b7;
+}
+
+.info-box .icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.info-box strong {
+  display: block;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+}
+
+.info-box p {
+  color: #475569;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ============================================
+   CAMERA
+   ============================================ */
+
+.camera-box {
+  position: relative;
+  background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  aspect-ratio: 4/3;
+}
+
+.video-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.face-outline {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 340px;
+  border: 3px dashed rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.camera-controls {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.photo-preview {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.photo-preview img {
+  width: 100%;
+  border-radius: 16px;
+  display: block;
+}
+
+.preview-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #10b981;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.tips {
+  margin-top: 1.5rem;
+}
+
+.tips p {
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.75rem;
+}
+
+.tips ul {
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  padding-left: 1.25rem;
+}
+
+/* ============================================
+   REVIEW CARD
+   ============================================ */
+
+.review-card {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.review-section {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.review-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.review-section h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+
+.detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  font-size: 0.95rem;
+}
+
+.detail span {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.detail strong {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.review-photo {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 3px solid #e2e8f0;
+}
+
+/* ============================================
+   SUCCESS STATE
+   ============================================ */
+
+.success-state {
+  text-align: center;
+}
+
+.success-icon {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: white;
+  margin: 0 auto 2rem;
+  animation: scaleIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.timeline {
+  max-width: 500px;
+  margin: 2rem auto;
+  text-align: left;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  align-items: flex-start;
+}
+
+.timeline-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.timeline-item strong {
+  display: block;
+  color: #1e293b;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.timeline-item p {
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ============================================
+   ALERTS
+   ============================================ */
+
+.alert-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+.btn-primary,
+.btn-secondary {
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary.pulse {
+  animation: buttonPulse 2s infinite;
+}
+
+@keyframes buttonPulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+  50% { box-shadow: 0 4px 24px rgba(102, 126, 234, 0.8); }
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.btn-lg {
+  padding: 1.25rem 2.5rem;
+  font-size: 1.125rem;
+}
+
+/* ============================================
+   NAVIGATION BUTTONS
+   ============================================ */
+
+.nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.nav-buttons button {
+  flex: 1;
+}
+
+.nav-buttons button:only-child {
+  margin-left: auto;
+}
+
+/* ============================================
+   LOADING & ERROR STATES
+   ============================================ */
+
+.reg-loading,
+.reg-error {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-align: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 1.5rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.reg-loading p,
+.reg-error p {
+  font-size: 1.125rem;
+  margin-bottom: 2rem;
+}
+
+.reg-error h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .registration-wrapper {
+    padding: 1rem;
+  }
+
+  .reg-card {
+    padding: 2rem 1.5rem;
+    border-radius: 20px;
+  }
+
+  .step-content h2 {
+    font-size: 1.5rem;
+  }
+
+  .progress-dots {
+    gap: 0.5rem;
+  }
+
+  .dot span {
+    width: 36px;
+    height: 36px;
+  }
+
+  .dot label {
+    font-size: 0.7rem;
+  }
+
+  .nav-buttons {
+    flex-direction: column;
+  }
+
+  .face-outline {
+    width: 200px;
+    height: 260px;
+  }
+
+  .review-photo {
+    width: 150px;
+    height: 150px;
+  }
+
+  .btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+  }
+}

@@ -11,8 +11,22 @@ const { validateBody } = require('../utils/validators');
 const upload = require('../middleware/upload');
 
 /**
+ * @route   POST /api/registrations/register
+ * @desc    Register guest for an event (NEW - FRONTEND COMPATIBLE)
+ * @access  Public
+ * @rateLimit 20 registrations per hour per IP
+ */
+router.post(
+  '/register',
+  registrationLimiter,
+  upload.single('selfie'),
+  validateBody('registration'),
+  registrationController.registerGuest
+);
+
+/**
  * @route   POST /api/registrations
- * @desc    Register guest for an event
+ * @desc    Register guest for an event (LEGACY - BACKWARD COMPATIBLE)
  * @access  Public
  * @rateLimit 20 registrations per hour per IP
  */

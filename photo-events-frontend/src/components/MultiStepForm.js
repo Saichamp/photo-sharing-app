@@ -5,7 +5,7 @@ import { registrationAPI, eventAPI } from '../services/api';
 import './MultiStepForm.css';
 
 const MultiStepForm = () => {
-  const { eventId } = useParams();
+  const { eventId: eventIdFromUrl } = useParams(); // This is the QR code or URL param
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,12 +16,13 @@ const MultiStepForm = () => {
   const [stream, setStream] = useState(null);
 
   const [formData, setFormData] = useState({
-    eventId: '',
+    eventId: '', // ✅ This will store the real MongoDB ObjectId
     name: '',
     email: '',
     phone: '',
     capturedImage: null,
-    faceImageUrl: ''
+    faceImageUrl: '',
+    faceImageBlob: null
   });
 
   const [errors, setErrors] = useState({});
@@ -29,26 +30,39 @@ const MultiStepForm = () => {
   // Load event info when component mounts
   useEffect(() => {
     const loadEventInfo = async () => {
-      if (!eventId) {
+      if (!eventIdFromUrl) {
         setLoadingEvent(false);
         return;
       }
 
       try {
         setLoadingEvent(true);
-        const response = await eventAPI.getByQRCode(eventId);
-        setEventInfo(response.data);
-        setFormData(prev => ({ ...prev, eventId: eventId }));
+        // ✅ FIX: Use the QR/URL param to fetch event
+        const response = await eventAPI.getByQRCode(eventIdFromUrl);
+        const eventData = response.data?.data || response.data;
+        
+        setEventInfo(eventData);
+        
+        // ✅ CRITICAL FIX: Store the real MongoDB _id from the backend
+        setFormData(prev => ({
+          ...prev,
+          eventId: eventData._id || eventData.id // Use the real ObjectId from DB
+        }));
+        
+        console.log('✅ Event loaded successfully');
+        console.log('   Event Name:', eventData.name);
+        console.log('   Event MongoDB ID:', eventData._id || eventData.id);
       } catch (error) {
         console.error('Failed to load event:', error);
         setEventInfo(null);
+        setErrors({ event: 'Invalid or expired event link' });
       } finally {
         setLoadingEvent(false);
       }
     };
 
     loadEventInfo();
-  }, [eventId]);
+  }, [eventIdFromUrl]);
 
   // Validation functions
   const validateStep1 = () => {
@@ -120,84 +134,69 @@ const MultiStepForm = () => {
   };
 
   // Submit registration to backend
- // Submit registration to backend
-// Submit registration to backend
-const submitRegistration = async () => {
-  setIsLoading(true);
-  setErrors({}); // Clear any previous errors
-  
-  try {
-    console.log('📝 Starting registration submission...');
-    console.log('   Event ID:', eventId);
-    console.log('   User Data:', { name: formData.name, email: formData.email, phone: formData.phone });
-    
-    // Create FormData for multipart upload
-    const formDataToSend = new FormData();
-    formDataToSend.append('eventId', eventId);
-    formDataToSend.append('name', formData.name);
-    formDataToSend.append('email', formData.email);
-    formDataToSend.append('phone', formData.phone);
-    
-    // Add the captured image blob
-    if (formData.faceImageBlob) {
-      formDataToSend.append('selfie', formData.faceImageBlob, 'selfie.jpg');
-      console.log('✅ Selfie blob attached (real image)');
-    } else if (formData.capturedImage && formData.capturedImage !== 'demo-image.jpg') {
-      // Fallback: Convert capturedImage URL to blob
-      try {
-        const response = await fetch(formData.capturedImage);
-        const blob = await response.blob();
-        formDataToSend.append('selfie', blob, 'selfie.jpg');
-        console.log('✅ Selfie attached (converted from URL)');
-      } catch (err) {
-        console.warn('⚠️  Could not convert image URL to blob:', err);
+  const submitRegistration = async () => {
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      console.log('📝 Starting registration submission...');
+      console.log('   Event MongoDB ID:', formData.eventId);
+      console.log('   User Data:', {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone
+      });
+
+      // ✅ FIX: Validate we have a real eventId before submitting
+      if (!formData.eventId) {
+        throw new Error('Event ID is missing. Please reload the page.');
       }
-    } else {
-      console.warn('⚠️  No selfie image available - proceeding without face data');
+
+      // Create FormData for multipart upload
+      const formDataToSend = new FormData();
+      formDataToSend.append('eventId', formData.eventId); // ✅ Now sending real ObjectId
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('phone', formData.phone);
+
+      // Add the captured image blob
+      if (formData.faceImageBlob) {
+        formDataToSend.append('selfie', formData.faceImageBlob, 'selfie.jpg');
+        console.log('✅ Selfie blob attached');
+      } else if (formData.capturedImage && formData.capturedImage !== 'demo-image.jpg') {
+        try {
+          const response = await fetch(formData.capturedImage);
+          const blob = await response.blob();
+          formDataToSend.append('selfie', blob, 'selfie.jpg');
+          console.log('✅ Selfie attached (converted from URL)');
+        } catch (err) {
+          console.warn('⚠️ Could not convert image URL to blob:', err);
+        }
+      } else {
+        console.warn('⚠️ No selfie image available - proceeding without face data');
+      }
+
+      console.log('📤 Sending registration to API...');
+      const response = await registrationAPI.register(formDataToSend);
+      console.log('✅ Registration successful!');
+
+      // Move to success screen
+      setCurrentStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (error) {
+      console.error('❌ Registration failed:', error);
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.message || 
+        'Registration failed. Please try again.';
+      
+      setErrors({ submit: errorMessage });
+      alert(`Registration Error:\n${errorMessage}`);
+    } finally {
+      setIsLoading(false);
     }
-
-    console.log('📤 Sending registration to API...');
-    
-    // Make API call
-    const response = await registrationAPI.create(formDataToSend);
-    
-    console.log('✅ Registration API call successful!');
-    console.log('   Response data:', response.data);
-    
-    // ✅ CRITICAL: Move to success screen
-    console.log('🎉 Moving to Step 4 (Success Screen)');
-    setCurrentStep(4);
-    
-    // Scroll to top to show success message
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    console.log('✅ Registration flow completed successfully!');
-    
-  } catch (error) {
-    console.error('❌ Registration failed!');
-    console.error('   Error object:', error);
-    console.error('   Error message:', error.message);
-    console.error('   Response data:', error.response?.data);
-    console.error('   Status code:', error.response?.status);
-    
-    // Extract error message
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.error || 
-                        error.message ||
-                        'Registration failed. Please try again.';
-    
-    // Set error in state
-    setErrors({ submit: errorMessage });
-    
-    // Show alert as fallback
-    alert(`Registration Error:\n${errorMessage}\n\nPlease try again or contact support.`);
-    
-  } finally {
-    setIsLoading(false);
-    console.log('🏁 Registration submission complete (loading state cleared)');
-  }
-};
-
+  };
 
   // Navigation functions
   const nextStep = () => {
@@ -232,7 +231,7 @@ const submitRegistration = async () => {
   }
 
   // Show error if event not found
-  if (!eventInfo && eventId) {
+  if (!eventInfo && eventIdFromUrl) {
     return (
       <div className="registration-page">
         <div className="error-hero">
@@ -703,6 +702,12 @@ const submitRegistration = async () => {
               </div>
             </div>
 
+            {errors.submit && (
+              <div className="error-message-large">
+                {errors.submit}
+              </div>
+            )}
+
             <div className="step-actions">
               <button onClick={prevStep} className="btn-step-secondary">
                 ← Back to Edit
@@ -725,53 +730,53 @@ const submitRegistration = async () => {
           </div>
         );
 
-     case 4:
-  return (
-    <div className="step-content success">
-      <div className="success-celebration">
-        <div className="celebration-animation">🎉</div>
-        <h2>Welcome to PhotoEvents!</h2>
-        <p>Your registration is complete and you're ready to receive photos automatically</p>
-      </div>
+      case 4:
+        return (
+          <div className="step-content success">
+            <div className="success-celebration">
+              <div className="celebration-animation">🎉</div>
+              <h2>Welcome to PhotoEvents!</h2>
+              <p>Your registration is complete and you're ready to receive photos automatically</p>
+            </div>
 
-      <div className="success-details">
-        <div className="success-card">
-          <h3>Your Registration Summary</h3>
-          <div className="registration-id">
-            <span className="id-label">Registration ID:</span>
-            <span className="id-value">#PE{Date.now().toString().slice(-6)}</span>
+            <div className="success-details">
+              <div className="success-card">
+                <h3>Your Registration Summary</h3>
+                <div className="registration-id">
+                  <span className="id-label">Registration ID:</span>
+                  <span className="id-value">#PE{Date.now().toString().slice(-6)}</span>
+                </div>
+                <div className="registered-details">
+                  <p><strong>Name:</strong> {formData.name}</p>
+                  <p><strong>Email:</strong> {formData.email}</p>
+                  <p><strong>Phone:</strong> {formData.phone}</p>
+                  {eventInfo && (
+                    <p><strong>Event:</strong> {eventInfo.name}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="success-actions">
+              <button onClick={() => navigate('/')} className="btn-success-primary">
+                🏠 Return to Home
+              </button>
+              <button onClick={() => navigate('/dashboard')} className="btn-success-secondary">
+                📊 View Dashboard
+              </button>
+            </div>
+
+            <div className="success-tips">
+              <h3>💡 Pro Tips</h3>
+              <ul>
+                <li>📧 Check your email for confirmation</li>
+                <li>📸 Enjoy the event - photos will come to you automatically</li>
+                <li>🔄 Processing typically takes 1-3 hours after photo upload</li>
+                <li>📱 Save this page as a bookmark for future reference</li>
+              </ul>
+            </div>
           </div>
-          <div className="registered-details">
-            <p><strong>Name:</strong> {formData.name}</p>
-            <p><strong>Email:</strong> {formData.email}</p>
-            <p><strong>Phone:</strong> {formData.phone}</p>
-            {eventInfo && (
-              <p><strong>Event:</strong> {eventInfo.name}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="success-actions">
-        <button onClick={() => navigate('/')} className="btn-success-primary">
-          🏠 Return to Home
-        </button>
-        <button onClick={() => navigate('/dashboard')} className="btn-success-secondary">
-          📊 View Dashboard
-        </button>
-      </div>
-
-      <div className="success-tips">
-        <h3>💡 Pro Tips</h3>
-        <ul>
-          <li>📧 Check your email for confirmation</li>
-          <li>📸 Enjoy the event - photos will come to you automatically</li>
-          <li>🔄 Processing typically takes 1-3 hours after photo upload</li>
-          <li>📱 Save this page as a bookmark for future reference</li>
-        </ul>
-      </div>
-    </div>
-  );
+        );
 
       default:
         return null;

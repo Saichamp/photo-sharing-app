@@ -1,67 +1,80 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { eventAPI } from '../../services/api';
-import { Loader } from '../../components/common/Loader';
+import {Loader} from '../../components/common/Loader';
 import CreateEvent from './CreateEvent';
 import EventList from './EventList';
 import PhotoUpload from './PhotoUpload';
 import Analytics from './Analytics';
+import ProfilePage from './ProfilePage';
+import BillingPage from './BillingPage';
 import './DashboardPage.css';
 
 const DashboardPage = () => {
   const { user } = useAuth();
   const location = useLocation();
-  const [stats, setStats] = useState(null);
+  const navigate = useNavigate();
+  
+  const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Wrap loadStats in useCallback to make it stable
-  const loadStats = useCallback(async () => {
+  // Load all events
+  const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await eventAPI.getAll();
       
-      // Calculate stats from events
-      const events = response.data?.events || [];
-      const totalEvents = events.length;
-      const upcomingEvents = events.filter(e => e.status === 'upcoming').length;
-      const activeEvents = events.filter(e => e.status === 'active').length;
-      const totalPhotos = events.reduce((sum, e) => sum + (e.photosUploaded || 0), 0);
-      const totalGuests = events.reduce((sum, e) => sum + (e.registrationCount || 0), 0);
-
-      setStats({
-        totalEvents,
-        upcomingEvents,
-        activeEvents,
-        totalPhotos,
-        totalGuests
-      });
+      console.log('🔄 Loading events...');
+      const response = await eventAPI.getAll();
+      const eventsData = response.data?.data?.events || response.data?.events || [];
+      
+      console.log('✅ Events loaded:', eventsData);
+      setEvents(eventsData);
+      
     } catch (error) {
-      console.error('Failed to load stats:', error);
-      setError(error.response?.data?.message || 'Failed to load stats');
-      // Set default stats on error
-      setStats({
-        totalEvents: 0,
-        upcomingEvents: 0,
-        activeEvents: 0,
-        totalPhotos: 0,
-        totalGuests: 0
-      });
+      console.error('❌ Failed to load events:', error);
+      setError(error.response?.data?.message || 'Failed to load events');
+      setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, []); // Empty array - no dependencies needed
+  }, []);
 
-  // Run once on mount
+  // Initial load
   useEffect(() => {
-    loadStats();
-  }, [loadStats]); // Include loadStats as dependency
+    loadEvents();
+  }, [loadEvents]);
+
+  // Handle any data change
+  const handleDataChange = useCallback(() => {
+    console.log('🔄 Data changed, reloading...');
+    loadEvents();
+  }, [loadEvents]);
+
+  // Handle event creation success
+  const handleEventCreated = useCallback((newEvent) => {
+    console.log('🎉 Event created:', newEvent);
+    loadEvents();
+    setTimeout(() => navigate('/dashboard'), 300);
+  }, [loadEvents, navigate]);
+
+  // Calculate stats
+  const stats = {
+    totalEvents: events.length,
+    upcomingEvents: events.filter(e => e.status === 'upcoming').length,
+    activeEvents: events.filter(e => e.status === 'active').length,
+    completedEvents: events.filter(e => e.status === 'completed').length,
+    totalPhotos: events.reduce((sum, e) => sum + (e.photosUploaded || 0), 0),
+    totalGuests: events.reduce((sum, e) => sum + (e.registrationCount || 0), 0)
+  };
 
   const isTabActive = (tab) => {
-    if (tab === 'overview') return location.pathname === '/dashboard';
-    return location.pathname.includes(tab);
+    const path = location.pathname;
+    if (tab === 'events') return path === '/dashboard' || path === '/dashboard/';
+    return path.includes(tab);
   };
 
   return (
@@ -85,16 +98,10 @@ const DashboardPage = () => {
         </div>
 
         {/* Stats Cards */}
-        {loading ? (
+        {loading && events.length === 0 ? (
           <div className="stats-loading">
-            <Loader size="md" text="Loading dashboard..." />
-          </div>
-        ) : error ? (
-          <div className="alert alert-error" style={{ marginBottom: 'var(--space-8)' }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" />
-            </svg>
-            {error}
+            <Loader size="md" />
+            <p>Loading dashboard...</p>
           </div>
         ) : (
           <div className="stats-grid">
@@ -105,17 +112,17 @@ const DashboardPage = () => {
                 </svg>
               </div>
               <div className="stat-content">
-                <div className="stat-value">{stats?.totalEvents || 0}</div>
+                <div className="stat-value">{stats.totalEvents}</div>
                 <div className="stat-label">Total Events</div>
                 <div className="stat-progress">
                   <div className="progress-bar">
                     <div 
                       className="progress-fill purple"
-                      style={{ width: `${Math.min((stats?.totalEvents / (user?.quota?.eventsLimit || 3)) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((stats.totalEvents / (user?.quota?.eventsLimit || 3)) * 100, 100)}%` }}
                     />
                   </div>
                   <span className="progress-text">
-                    {stats?.totalEvents}/{user?.quota?.eventsLimit || 3} used
+                    {stats.totalEvents}/{user?.quota?.eventsLimit || 3} used
                   </span>
                 </div>
               </div>
@@ -128,10 +135,10 @@ const DashboardPage = () => {
                 </svg>
               </div>
               <div className="stat-content">
-                <div className="stat-value">{stats?.totalPhotos || 0}</div>
+                <div className="stat-value">{stats.totalPhotos}</div>
                 <div className="stat-label">Photos Uploaded</div>
                 <div className="stat-badge badge-pink">
-                  {stats?.activeEvents || 0} Active
+                  {stats.activeEvents} Active
                 </div>
               </div>
             </div>
@@ -143,10 +150,10 @@ const DashboardPage = () => {
                 </svg>
               </div>
               <div className="stat-content">
-                <div className="stat-value">{stats?.totalGuests || 0}</div>
+                <div className="stat-value">{stats.totalGuests}</div>
                 <div className="stat-label">Registered Guests</div>
                 <div className="stat-badge badge-rose">
-                  {stats?.upcomingEvents || 0} Upcoming
+                  {stats.upcomingEvents} Upcoming
                 </div>
               </div>
             </div>
@@ -172,13 +179,17 @@ const DashboardPage = () => {
         <div className="dashboard-tabs">
           <Link 
             to="/dashboard"
-            className={`tab-link ${isTabActive('overview') ? 'active' : ''}`}
+            className={`tab-link ${isTabActive('events') ? 'active' : ''}`}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
             </svg>
             Events
+            {stats.totalEvents > 0 && (
+              <span className="tab-badge">{stats.totalEvents}</span>
+            )}
           </Link>
+          
           <Link 
             to="/dashboard/create"
             className={`tab-link ${isTabActive('create') ? 'active' : ''}`}
@@ -188,6 +199,7 @@ const DashboardPage = () => {
             </svg>
             Create Event
           </Link>
+          
           <Link 
             to="/dashboard/upload"
             className={`tab-link ${isTabActive('upload') ? 'active' : ''}`}
@@ -197,6 +209,7 @@ const DashboardPage = () => {
             </svg>
             Upload Photos
           </Link>
+          
           <Link 
             to="/dashboard/analytics"
             className={`tab-link ${isTabActive('analytics') ? 'active' : ''}`}
@@ -211,10 +224,54 @@ const DashboardPage = () => {
         {/* Tab Content */}
         <div className="dashboard-content">
           <Routes>
-            <Route index element={<EventList onEventCreated={loadStats} />} />
-            <Route path="create" element={<CreateEvent onEventCreated={loadStats} />} />
-            <Route path="upload" element={<PhotoUpload />} />
-            <Route path="analytics" element={<Analytics />} />
+            <Route 
+              index 
+              element={
+                <EventList 
+                  events={events}
+                  loading={loading}
+                  selectedEvent={selectedEvent}
+                  onEventSelect={setSelectedEvent}
+                  onEventUpdate={handleDataChange}
+                  onEventDelete={handleDataChange}
+                />
+              } 
+            />
+            <Route 
+              path="create" 
+              element={
+                <CreateEvent onEventCreated={handleEventCreated} />
+              } 
+            />
+            <Route 
+              path="upload" 
+              element={
+                <PhotoUpload 
+                  events={events}
+                  selectedEvent={selectedEvent}
+                  onEventSelect={setSelectedEvent}
+                  onPhotosUploaded={handleDataChange}
+                />
+              } 
+            />
+            <Route 
+              path="analytics" 
+              element={
+                <Analytics events={events} stats={stats} />
+              } 
+            />
+            <Route 
+              path="profile" 
+              element={
+                <ProfilePage />
+              } 
+            />
+            <Route 
+              path="billing" 
+              element={
+                <BillingPage />
+              } 
+            />
           </Routes>
         </div>
       </div>

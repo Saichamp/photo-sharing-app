@@ -1,209 +1,251 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { eventAPI } from '../../services/api';
-import { Loader } from '../../components/common/Loader';
+import React, { useState } from 'react';
 import './EventList.css';
 
-const EventList = ({ onEventCreated }) => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all');
+const EventList = ({ events = [], loading = false, selectedEvent, onEventSelect, onEventUpdate, onEventDelete }) => {
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [filterStatus, setFilterStatus] = useState('all');
 
-  const loadEvents = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const params = filter !== 'all' ? { status: filter } : {};
-      const response = await eventAPI.getAll(params);
-      
-      const eventsData = response.data?.events || response.data?.data || [];
-      const eventsArray = Array.isArray(eventsData) ? eventsData : [];
-      setEvents(eventsArray);
-      
-      if (onEventCreated) onEventCreated();
-    } catch (err) {
-      console.error('Failed to load events:', err);
-      setError(err.response?.data?.message || 'Failed to load events');
-      setEvents([]);
-    } finally {
-      setLoading(false);
+  const getStatusConfig = (status) => {
+    switch (status) {
+      case 'active':
+        return { color: '#10b981', bg: '#d1fae5', text: 'Active', icon: '●' };
+      case 'completed':
+        return { color: '#6366f1', bg: '#e0e7ff', text: 'Completed', icon: '✓' };
+      case 'upcoming':
+        return { color: '#f59e0b', bg: '#fef3c7', text: 'Upcoming', icon: '○' };
+      default:
+        return { color: '#6b7280', bg: '#f3f4f6', text: 'Draft', icon: '•' };
     }
-  }, [filter, onEventCreated]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
-
-  const getStatusColor = (status) => {
-    const statusColors = {
-      upcoming: '#3b82f6',
-      active: '#10b981',
-      completed: '#6b7280',
-      draft: '#f59e0b'
-    };
-    return statusColors[status] || '#6b7280';
   };
 
-  const getStatusLabel = (status) => {
-    const statusLabels = {
-      upcoming: 'Upcoming',
-      active: 'Active',
-      completed: 'Completed',
-      draft: 'Draft'
-    };
-    return statusLabels[status] || status;
+  const copyRegistrationLink = (qrCode, e) => {
+    e.stopPropagation();
+    const link = `${window.location.origin}/register/${qrCode}`;
+    navigator.clipboard.writeText(link);
+
+    // Show notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      background: #10b981;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      z-index: 10000;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease-out;
+    `;
+    notification.textContent = '✓ Registration link copied to clipboard!';
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => document.body.removeChild(notification), 300);
+    }, 2500);
   };
 
   const formatDate = (dateString) => {
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return dateString;
-    }
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays <= 7) return `In ${diffDays} days`;
+
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
-  if (loading) {
+  // Filter and sort events
+  const filteredEvents = events
+    .filter(event => filterStatus === 'all' || event.status === filterStatus)
+    .sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'date':
+          aValue = new Date(a.date);
+          bValue = new Date(b.date);
+          break;
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'registrations':
+          aValue = a.registrationCount || 0;
+          bValue = b.registrationCount || 0;
+          break;
+        case 'photos':
+          aValue = a.photosUploaded || 0;
+          bValue = b.photosUploaded || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      return sortOrder === 'asc' ? 
+        (aValue > bValue ? 1 : -1) : 
+        (aValue < bValue ? 1 : -1);
+    });
+
+  if (loading && events.length === 0) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <Loader size="lg" text="Loading your events..." />
+      <div className="event-list-loading">
+        <div className="spinner"></div>
+        <p>Loading events...</p>
       </div>
     );
   }
 
-  if (error) {
+  if (!events || events.length === 0) {
     return (
-      <div className="error-state">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 8v4M12 16h.01"/>
-        </svg>
-        <h3>Failed to Load Events</h3>
-        <p>{error}</p>
-        <button onClick={loadEvents} className="btn btn-primary">
-          Try Again
-        </button>
+      <div className="event-list-empty">
+        <div className="empty-icon">📅</div>
+        <h3>No Events Yet</h3>
+        <p>Create your first event to get started with PhotoManEa</p>
+        <a href="/dashboard/create" className="btn btn-primary">
+          + Create Your First Event
+        </a>
       </div>
     );
   }
 
   return (
     <div className="event-list-container">
-      <div className="filter-tabs">
-        <button
-          className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All Events ({events.length})
-        </button>
-        <button
-          className={`filter-tab ${filter === 'upcoming' ? 'active' : ''}`}
-          onClick={() => setFilter('upcoming')}
-        >
-          Upcoming
-        </button>
-        <button
-          className={`filter-tab ${filter === 'active' ? 'active' : ''}`}
-          onClick={() => setFilter('active')}
-        >
-          Active
-        </button>
-        <button
-          className={`filter-tab ${filter === 'completed' ? 'active' : ''}`}
-          onClick={() => setFilter('completed')}
-        >
-          Completed
-        </button>
+      {/* Header with Filters */}
+      <div className="event-list-header">
+        <div className="header-left">
+          <h2>My Events</h2>
+          <p className="subtitle">
+            Showing {filteredEvents.length} of {events.length} events
+          </p>
+        </div>
+
+        <div className="header-right">
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">All Events ({events.length})</option>
+            <option value="upcoming">
+              Upcoming ({events.filter(e => e.status === 'upcoming').length})
+            </option>
+            <option value="active">
+              Active ({events.filter(e => e.status === 'active').length})
+            </option>
+            <option value="completed">
+              Completed ({events.filter(e => e.status === 'completed').length})
+            </option>
+          </select>
+
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            className="sort-select"
+          >
+            <option value="date">Date</option>
+            <option value="name">Name</option>
+            <option value="registrations">Registrations</option>
+            <option value="photos">Photos</option>
+          </select>
+
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="sort-toggle"
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </button>
+        </div>
       </div>
 
-      {events.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/>
-            </svg>
-          </div>
-          <h3>No Events Yet</h3>
-          <p>Create your first event to start managing photos with AI</p>
-          <Link to="/dashboard/create" className="btn btn-primary">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-            </svg>
-            Create First Event
-          </Link>
-        </div>
-      ) : (
-        <div className="events-grid">
-          {events.map((event) => (
-            <div key={event._id || event.id} className="event-card">
-              <div className="event-card-header">
-                <h3>{event.name || 'Untitled Event'}</h3>
-                <div 
-                  className="status-badge"
-                  style={{ background: getStatusColor(event.status) }}
-                >
-                  {getStatusLabel(event.status)}
-                </div>
+      {/* Event Grid */}
+      <div className="event-grid">
+        {filteredEvents.map((event) => {
+          const statusConfig = getStatusConfig(event.status);
+          const isSelected = selectedEvent?._id === event._id;
+          
+          return (
+            <div
+              key={event._id}
+              className={`event-card ${isSelected ? 'selected' : ''}`}
+              onClick={() => onEventSelect && onEventSelect(event)}
+            >
+              {/* Status Badge */}
+              <div 
+                className="event-status"
+                style={{ 
+                  background: statusConfig.bg, 
+                  color: statusConfig.color 
+                }}
+              >
+                <span className="status-icon">{statusConfig.icon}</span>
+                {statusConfig.text}
               </div>
 
-              <div className="event-card-body">
-                <div className="event-info">
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+              {/* Event Info */}
+              <div className="event-info">
+                <h3 className="event-title">{event.name}</h3>
+                <p className="event-date">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" />
                   </svg>
                   {formatDate(event.date)}
-                </div>
-
-                {event.location && (
-                  <div className="event-info">
-                    <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" />
-                    </svg>
-                    {event.location}
-                  </div>
+                </p>
+                {event.description && (
+                  <p className="event-description">
+                    {event.description.length > 80 
+                      ? `${event.description.substring(0, 80)}...` 
+                      : event.description}
+                  </p>
                 )}
+              </div>
 
-                <div className="event-stats">
-                  <div className="stat-item">
-                    <span className="stat-number">{event.registrationCount || 0}</span>
-                    <span className="stat-label">Guests</span>
-                  </div>
-                  <div className="stat-divider"></div>
-                  <div className="stat-item">
-                    <span className="stat-number">{event.photosUploaded || 0}</span>
-                    <span className="stat-label">Photos</span>
-                  </div>
-                  <div className="stat-divider"></div>
-                  <div className="stat-item">
-                    <span className="stat-number">{event.expectedGuests || 0}</span>
-                    <span className="stat-label">Expected</span>
-                  </div>
+              {/* Stats */}
+              <div className="event-stats">
+                <div className="stat-item">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                  </svg>
+                  <span>{event.registrationCount || 0}</span>
+                </div>
+                <div className="stat-item">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
+                  </svg>
+                  <span>{event.photosUploaded || 0}</span>
                 </div>
               </div>
 
-              <div className="event-card-footer">
-                <Link 
-                  to={`/dashboard/event/${event._id || event.id}`} 
-                  className="btn btn-ghost btn-sm"
+              {/* Actions */}
+              <div className="event-actions">
+                <button
+                  className="btn-action btn-primary"
+                  onClick={(e) => copyRegistrationLink(event.qrCode, e)}
+                  title="Copy registration link"
                 >
-                  View Details
-                </Link>
-                <Link 
-                  to={`/dashboard/upload?eventId=${event._id || event.id}`} 
-                  className="btn btn-primary btn-sm"
-                >
-                  Upload Photos
-                </Link>
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
+                    <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM15 11h2a1 1 0 110 2h-2v-2z" />
+                  </svg>
+                  Copy Link
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 };

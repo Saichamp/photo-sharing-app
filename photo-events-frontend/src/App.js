@@ -8,8 +8,11 @@ import { Loader } from './components/common/Loader';
 import { LoginPage } from './pages/Auth/LoginPage';
 import { RegisterPage } from './pages/Auth/RegisterPage';
 import LandingPage from './pages/LandingPage';
-import DashboardPage from './pages/Dashboard/DashboardPage'; // ← UPDATED
-import MultiStepForm from './components/MultiStepForm';
+import DashboardPage from './pages/Dashboard/DashboardPage';
+
+// Guest Registration Pages (Both versions available)
+import MultiStepForm from './components/MultiStepForm'; // OLD VERSION
+import GuestRegistration from './pages/Guest/GuestRegistration'; // NEW VERSION
 
 // Components
 import { Navbar } from './components/common/Navbar';
@@ -64,7 +67,11 @@ function AppRoutes() {
           }
         />
 
-        {/* Guest Registration (Public) */}
+        {/* Guest Registration Routes */}
+        {/* NEW: Beautiful redesigned version */}
+        <Route path="/event/register/:eventId" element={<GuestRegistration />} />
+        
+        {/* OLD: Keep existing version for backward compatibility */}
         <Route path="/register/:eventId" element={<MultiStepForm />} />
 
         {/* Protected Routes */}

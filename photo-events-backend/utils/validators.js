@@ -3,6 +3,7 @@
  * Provides validation functions for all user inputs
  */
 
+const mongoose = require('mongoose');
 const { AppError } = require('../middleware/errorHandler');
 
 /**
@@ -27,11 +28,35 @@ const isValidPhone = (phone) => {
 };
 
 /**
- * MongoDB ObjectId Validation
+ * MongoDB ObjectId Validation (using mongoose)
  */
 const isValidObjectId = (id) => {
-  if (!id || typeof id !== 'string') return false;
+  if (!id) return false;
+  
+  // Use mongoose validation if available
+  if (mongoose && mongoose.Types && mongoose.Types.ObjectId) {
+    return mongoose.Types.ObjectId.isValid(id);
+  }
+  
+  // Fallback to regex validation
+  if (typeof id !== 'string') return false;
   return /^[0-9a-fA-F]{24}$/.test(id);
+};
+
+/**
+ * Validate and sanitize ObjectId
+ * Throws error if invalid
+ */
+const validateObjectId = (id, fieldName = 'ID') => {
+  if (!id) {
+    throw new Error(`${fieldName} is required`);
+  }
+  
+  if (!isValidObjectId(id)) {
+    throw new Error(`Invalid ${fieldName} format`);
+  }
+  
+  return id;
 };
 
 /**
@@ -418,6 +443,7 @@ module.exports = {
   isValidEmail,
   isValidPhone,
   isValidObjectId,
+  validateObjectId,
   isValidName,
   isStrongPassword,
   isValidURL,
