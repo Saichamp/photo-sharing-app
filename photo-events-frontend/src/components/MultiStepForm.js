@@ -1,22 +1,24 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { registrationAPI, eventAPI } from '../services/api';
 import './MultiStepForm.css';
 
 const MultiStepForm = () => {
-  const { eventId: eventIdFromUrl } = useParams(); // This is the QR code or URL param
+  const { eventId: eventIdFromUrl } = useParams(); // QR / URL param
   const navigate = useNavigate();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [eventInfo, setEventInfo] = useState(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
 
   const [formData, setFormData] = useState({
-    eventId: '', // ✅ This will store the real MongoDB ObjectId
+    eventId: '',        // Real MongoDB ObjectId from backend
     name: '',
     email: '',
     phone: '',
@@ -37,18 +39,18 @@ const MultiStepForm = () => {
 
       try {
         setLoadingEvent(true);
-        // ✅ FIX: Use the QR/URL param to fetch event
+        // Use the QR/URL param to fetch event
         const response = await eventAPI.getByQRCode(eventIdFromUrl);
         const eventData = response.data?.data || response.data;
-        
+
         setEventInfo(eventData);
-        
-        // ✅ CRITICAL FIX: Store the real MongoDB _id from the backend
+
+        // Store the real MongoDB _id from the backend
         setFormData(prev => ({
           ...prev,
-          eventId: eventData._id || eventData.id // Use the real ObjectId from DB
+          eventId: eventData._id || eventData.id
         }));
-        
+
         console.log('✅ Event loaded successfully');
         console.log('   Event Name:', eventData.name);
         console.log('   Event MongoDB ID:', eventData._id || eventData.id);
@@ -69,10 +71,12 @@ const MultiStepForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      newErrors.email = 'Invalid email format';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) newErrors.phone = 'Invalid phone number';
-    
+    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, '')))
+      newErrors.phone = 'Invalid phone number';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -89,8 +93,8 @@ const MultiStepForm = () => {
   // Camera functions
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: 640, height: 480 } 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 }
       });
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -98,7 +102,10 @@ const MultiStepForm = () => {
       setStream(mediaStream);
     } catch (error) {
       console.error('Camera access error:', error);
-      setErrors({ camera: 'Camera access denied. Please allow camera access and refresh.' });
+      setErrors({
+        camera:
+          'Camera access denied. Please allow camera access and refresh.'
+      });
     }
   };
 
@@ -106,18 +113,26 @@ const MultiStepForm = () => {
     if (videoRef.current && canvasRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
-      
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
+
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
-      
-      canvas.toBlob((blob) => {
-        const imageUrl = URL.createObjectURL(blob);
-        setFormData({ ...formData, capturedImage: imageUrl, faceImageBlob: blob });
-        stopCamera();
-      }, 'image/jpeg', 0.8);
+
+      canvas.toBlob(
+        (blob) => {
+          const imageUrl = URL.createObjectURL(blob);
+          setFormData({
+            ...formData,
+            capturedImage: imageUrl,
+            faceImageBlob: blob
+          });
+          stopCamera();
+        },
+        'image/jpeg',
+        0.8
+      );
     }
   };
 
@@ -129,7 +144,11 @@ const MultiStepForm = () => {
   };
 
   const retakePhoto = () => {
-    setFormData({ ...formData, capturedImage: null, faceImageBlob: null });
+    setFormData({
+      ...formData,
+      capturedImage: null,
+      faceImageBlob: null
+    });
     startCamera();
   };
 
@@ -147,14 +166,14 @@ const MultiStepForm = () => {
         phone: formData.phone
       });
 
-      // ✅ FIX: Validate we have a real eventId before submitting
+      // Validate we have a real eventId before submitting
       if (!formData.eventId) {
         throw new Error('Event ID is missing. Please reload the page.');
       }
 
       // Create FormData for multipart upload
       const formDataToSend = new FormData();
-      formDataToSend.append('eventId', formData.eventId); // ✅ Now sending real ObjectId
+      formDataToSend.append('eventId', formData.eventId);
       formDataToSend.append('name', formData.name);
       formDataToSend.append('email', formData.email);
       formDataToSend.append('phone', formData.phone);
@@ -163,7 +182,10 @@ const MultiStepForm = () => {
       if (formData.faceImageBlob) {
         formDataToSend.append('selfie', formData.faceImageBlob, 'selfie.jpg');
         console.log('✅ Selfie blob attached');
-      } else if (formData.capturedImage && formData.capturedImage !== 'demo-image.jpg') {
+      } else if (
+        formData.capturedImage &&
+        formData.capturedImage !== 'demo-image.jpg'
+      ) {
         try {
           const response = await fetch(formData.capturedImage);
           const blob = await response.blob();
@@ -173,24 +195,39 @@ const MultiStepForm = () => {
           console.warn('⚠️ Could not convert image URL to blob:', err);
         }
       } else {
-        console.warn('⚠️ No selfie image available - proceeding without face data');
+        console.warn(
+          '⚠️ No selfie image available - proceeding without face data'
+        );
       }
 
-      console.log('📤 Sending registration to API...');
-      const response = await registrationAPI.register(formDataToSend);
-      console.log('✅ Registration successful!');
+console.log('📤 Sending registration to API...');
+const response = await registrationAPI.register(formDataToSend);
 
-      // Move to success screen
-      setCurrentStep(4);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+console.log('✅ Registration successful!');
+console.log('REG RESPONSE:', response.data);
 
+// Read registrationId from backend response
+const registrationId =
+  response.data?.data?.id ||
+  response.data?.data?._id ||
+  response.data?.data?.registrationId;
+console.log('REG ID FOR GALLERY:', registrationId);
+
+if (registrationId) {
+  // Navigate to guest gallery
+  navigate(`/guest/gallery/${registrationId}`);
+} else {
+  // Fallback: success step
+  setCurrentStep(4);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
     } catch (error) {
       console.error('❌ Registration failed:', error);
-      const errorMessage = 
-        error.response?.data?.message || 
-        error.message || 
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
         'Registration failed. Please try again.';
-      
+
       setErrors({ submit: errorMessage });
       alert(`Registration Error:\n${errorMessage}`);
     } finally {
@@ -214,271 +251,6 @@ const MultiStepForm = () => {
       setCurrentStep(currentStep - 1);
     }
   };
-
-  // Show loading screen while loading event
-  if (loadingEvent) {
-    return (
-      <div className="registration-page">
-        <div className="loading-hero">
-          <div className="loading-animation">
-            <div className="loading-spinner-large"></div>
-            <h2>Loading Event Details...</h2>
-            <p>Preparing your registration experience</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error if event not found
-  if (!eventInfo && eventIdFromUrl) {
-    return (
-      <div className="registration-page">
-        <div className="error-hero">
-          <div className="error-content">
-            <div className="error-icon-large">❌</div>
-            <h2>Event Not Found</h2>
-            <p>The event QR code is invalid or the event may have been removed.</p>
-            <button onClick={() => navigate('/')} className="btn-primary-large">
-              Return Home
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="registration-page">
-      {/* Premium Header with Event Info */}
-      <div className="registration-hero">
-        <div className="hero-background">
-          <div className="hero-pattern"></div>
-        </div>
-        
-        <div className="hero-content">
-          <div className="hero-nav">
-            <div className="brand-logo">
-              <span className="logo-icon">📸</span>
-              <span className="logo-text">PhotoEvents</span>
-            </div>
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="btn-nav-link"
-            >
-              Dashboard →
-            </button>
-          </div>
-
-          {eventInfo && (
-            <div className="event-showcase">
-              <div className="event-badge">
-                <span className="badge-icon">🎉</span>
-                Live Event Registration
-              </div>
-              
-              <h1 className="event-title">{eventInfo.name}</h1>
-              
-              <div className="event-details">
-                <div className="detail-item">
-                  <span className="detail-icon">📅</span>
-                  <span>{new Date(eventInfo.date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-icon">👥</span>
-                  <span>{eventInfo.expectedGuests} expected guests</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-icon">🤖</span>
-                  <span>AI-powered photo delivery</span>
-                </div>
-              </div>
-
-              <div className="registration-promise">
-                <h2>Get Your Event Photos Automatically</h2>
-                <p>Our AI will find and send you all your photos from this event. No more searching through hundreds of images!</p>
-              </div>
-            </div>
-          )}
-
-          {!eventInfo && (
-            <div className="event-showcase">
-              <div className="event-badge">
-                <span className="badge-icon">✨</span>
-                PhotoEvents Registration
-              </div>
-              
-              <h1 className="event-title">Join the Photo Experience</h1>
-              
-              <div className="registration-promise">
-                <h2>Never Miss Your Photos Again</h2>
-                <p>Register once, and we'll automatically find and send you photos from all your events using AI face recognition.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Progress & Benefits Section */}
-      <div className="progress-section">
-        <div className="progress-container">
-          <div className="progress-header">
-            <h3>Quick Registration Process</h3>
-            <p>Step {currentStep} of 4 - Only takes 2 minutes</p>
-          </div>
-
-          <div className="progress-visual">
-            <div className="progress-bar-modern">
-              <div 
-                className="progress-fill" 
-                style={{width: `${(currentStep / 4) * 100}%`}}
-              ></div>
-            </div>
-            
-            <div className="progress-steps">
-              {[
-                { number: 1, title: 'Your Details', icon: '👤', desc: 'Basic information' },
-                { number: 2, title: 'Face Capture', icon: '📸', desc: 'For AI matching' },
-                { number: 3, title: 'Review', icon: '✅', desc: 'Confirm details' },
-                { number: 4, title: 'Success', icon: '🎉', desc: 'Ready to receive photos' }
-              ].map(step => (
-                <div 
-                  key={step.number}
-                  className={`progress-step ${step.number <= currentStep ? 'active' : ''} ${step.number < currentStep ? 'completed' : ''}`}
-                >
-                  <div className="step-circle">
-                    <span className="step-icon">{step.icon}</span>
-                    <span className="step-number">{step.number}</span>
-                  </div>
-                  <div className="step-info">
-                    <div className="step-title">{step.title}</div>
-                    <div className="step-desc">{step.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Form Section */}
-      <div className="form-section">
-        <div className="form-layout">
-          {/* Form Content */}
-          <div className="form-content">
-            <div className="form-card">
-              {renderStepContent()}
-            </div>
-          </div>
-
-          {/* Benefits Sidebar */}
-          <div className="benefits-sidebar">
-            <div className="benefits-card">
-              <h3>Why Register?</h3>
-              
-              <div className="benefit-item">
-                <div className="benefit-icon">🤖</div>
-                <div>
-                  <h4>AI-Powered Matching</h4>
-                  <p>99.8% accurate face recognition finds all your photos automatically</p>
-                </div>
-              </div>
-
-              <div className="benefit-item">
-                <div className="benefit-icon">📧</div>
-                <div>
-                  <h4>Instant Delivery</h4>
-                  <p>Receive your personalized photo collection via email within hours</p>
-                </div>
-              </div>
-
-              <div className="benefit-item">
-                <div className="benefit-icon">🔒</div>
-                <div>
-                  <h4>100% Private</h4>
-                  <p>Your photos are securely processed and delivered only to you</p>
-                </div>
-              </div>
-
-              <div className="benefit-item">
-                <div className="benefit-icon">⚡</div>
-                <div>
-                  <h4>Zero Effort</h4>
-                  <p>No searching, no asking - photos come to you automatically</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="trust-indicators">
-              <h4>Trusted by 10,000+ users</h4>
-              <div className="trust-badges">
-                <div className="trust-badge">
-                  <span className="trust-icon">🔒</span>
-                  <span>GDPR Compliant</span>
-                </div>
-                <div className="trust-badge">
-                  <span className="trust-icon">⚡</span>
-                  <span>99.8% Accuracy</span>
-                </div>
-                <div className="trust-badge">
-                  <span className="trust-icon">📱</span>
-                  <span>Mobile Optimized</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Social Proof */}
-            <div className="testimonial">
-              <div className="testimonial-content">
-                <p>"PhotoEvents found 47 photos of me at the wedding. I didn't have to ask anyone!"</p>
-                <div className="testimonial-author">
-                  <div className="author-avatar">👤</div>
-                  <div>
-                    <div className="author-name">Sarah Johnson</div>
-                    <div className="author-title">Wedding Guest</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* How It Works Section */}
-      {currentStep === 2 && (
-        <div className="how-it-works-section">
-          <div className="how-it-works-container">
-            <h3>How Our AI Finds Your Photos</h3>
-            <div className="ai-process">
-              <div className="process-step">
-                <div className="process-icon">📸</div>
-                <h4>Photo Upload</h4>
-                <p>Event organizer uploads all event photos to our secure platform</p>
-              </div>
-              <div className="process-arrow">→</div>
-              <div className="process-step">
-                <div className="process-icon">🤖</div>
-                <h4>AI Analysis</h4>
-                <p>Our AI scans every face in every photo with 99.8% accuracy</p>
-              </div>
-              <div className="process-arrow">→</div>
-              <div className="process-step">
-                <div className="process-icon">📧</div>
-                <h4>Smart Delivery</h4>
-                <p>You receive a personalized collection of all photos containing you</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   // Render step content function
   function renderStepContent() {
@@ -782,6 +554,274 @@ const MultiStepForm = () => {
         return null;
     }
   }
+
+  // Loading event
+  if (loadingEvent) {
+    return (
+      <div className="registration-page">
+        <div className="loading-hero">
+          <div className="loading-animation">
+            <div className="loading-spinner-large"></div>
+            <h2>Loading Event Details...</h2>
+            <p>Preparing your registration experience</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Invalid event
+  if (!eventInfo && eventIdFromUrl) {
+    return (
+      <div className="registration-page">
+        <div className="error-hero">
+          <div className="error-content">
+            <div className="error-icon-large">❌</div>
+            <h2>Event Not Found</h2>
+            <p>The event QR code is invalid or the event may have been removed.</p>
+            <button
+              onClick={() => navigate('/')}
+              className="btn-primary-large"
+            >
+              Return Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="registration-page">
+      {/* Premium Header with Event Info */}
+      <div className="registration-hero">
+        <div className="hero-background">
+          <div className="hero-pattern"></div>
+        </div>
+        
+        <div className="hero-content">
+          <div className="hero-nav">
+            <div className="brand-logo">
+              <span className="logo-icon">📸</span>
+              <span className="logo-text">PhotoEvents</span>
+            </div>
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className="btn-nav-link"
+            >
+              Dashboard →
+            </button>
+          </div>
+
+          {eventInfo && (
+            <div className="event-showcase">
+              <div className="event-badge">
+                <span className="badge-icon">🎉</span>
+                Live Event Registration
+              </div>
+              
+              <h1 className="event-title">{eventInfo.name}</h1>
+              
+              <div className="event-details">
+                <div className="detail-item">
+                  <span className="detail-icon">📅</span>
+                  <span>{new Date(eventInfo.date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-icon">👥</span>
+                  <span>{eventInfo.expectedGuests} expected guests</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-icon">🤖</span>
+                  <span>AI-powered photo delivery</span>
+                </div>
+              </div>
+
+              <div className="registration-promise">
+                <h2>Get Your Event Photos Automatically</h2>
+                <p>Our AI will find and send you all your photos from this event. No more searching through hundreds of images!</p>
+              </div>
+            </div>
+          )}
+
+          {!eventInfo && (
+            <div className="event-showcase">
+              <div className="event-badge">
+                <span className="badge-icon">✨</span>
+                PhotoEvents Registration
+              </div>
+              
+              <h1 className="event-title">Join the Photo Experience</h1>
+              
+              <div className="registration-promise">
+                <h2>Never Miss Your Photos Again</h2>
+                <p>Register once, and we'll automatically find and send you photos from all your events using AI face recognition.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Progress & Benefits Section */}
+      <div className="progress-section">
+        <div className="progress-container">
+          <div className="progress-header">
+            <h3>Quick Registration Process</h3>
+            <p>Step {currentStep} of 4 - Only takes 2 minutes</p>
+          </div>
+
+          <div className="progress-visual">
+            <div className="progress-bar-modern">
+              <div 
+                className="progress-fill" 
+                style={{width: `${(currentStep / 4) * 100}%`}}
+              ></div>
+            </div>
+            
+            <div className="progress-steps">
+              {[
+                { number: 1, title: 'Your Details', icon: '👤', desc: 'Basic information' },
+                { number: 2, title: 'Face Capture', icon: '📸', desc: 'For AI matching' },
+                { number: 3, title: 'Review', icon: '✅', desc: 'Confirm details' },
+                { number: 4, title: 'Success', icon: '🎉', desc: 'Ready to receive photos' }
+              ].map(step => (
+                <div 
+                  key={step.number}
+                  className={`progress-step ${step.number <= currentStep ? 'active' : ''} ${step.number < currentStep ? 'completed' : ''}`}
+                >
+                  <div className="step-circle">
+                    <span className="step-icon">{step.icon}</span>
+                    <span className="step-number">{step.number}</span>
+                  </div>
+                  <div className="step-info">
+                    <div className="step-title">{step.title}</div>
+                    <div className="step-desc">{step.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Form Section */}
+      <div className="form-section">
+        <div className="form-layout">
+          {/* Form Content */}
+          <div className="form-content">
+            <div className="form-card">
+              {renderStepContent()}
+            </div>
+          </div>
+
+          {/* Benefits Sidebar */}
+          <div className="benefits-sidebar">
+            <div className="benefits-card">
+              <h3>Why Register?</h3>
+              
+              <div className="benefit-item">
+                <div className="benefit-icon">🤖</div>
+                <div>
+                  <h4>AI-Powered Matching</h4>
+                  <p>99.8% accurate face recognition finds all your photos automatically</p>
+                </div>
+              </div>
+
+              <div className="benefit-item">
+                <div className="benefit-icon">📧</div>
+                <div>
+                  <h4>Instant Delivery</h4>
+                  <p>Receive your personalized photo collection via email within hours</p>
+                </div>
+              </div>
+
+              <div className="benefit-item">
+                <div className="benefit-icon">🔒</div>
+                <div>
+                  <h4>100% Private</h4>
+                  <p>Your photos are securely processed and delivered only to you</p>
+                </div>
+              </div>
+
+              <div className="benefit-item">
+                <div className="benefit-icon">⚡</div>
+                <div>
+                  <h4>Zero Effort</h4>
+                  <p>No searching, no asking - photos come to you automatically</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Trust Indicators */}
+            <div className="trust-indicators">
+              <h4>Trusted by 10,000+ users</h4>
+              <div className="trust-badges">
+                <div className="trust-badge">
+                  <span className="trust-icon">🔒</span>
+                  <span>GDPR Compliant</span>
+                </div>
+                <div className="trust-badge">
+                  <span className="trust-icon">⚡</span>
+                  <span>99.8% Accuracy</span>
+                </div>
+                <div className="trust-badge">
+                  <span className="trust-icon">📱</span>
+                  <span>Mobile Optimized</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Social Proof */}
+            <div className="testimonial">
+              <div className="testimonial-content">
+                <p>"PhotoEvents found 47 photos of me at the wedding. I didn't have to ask anyone!"</p>
+                <div className="testimonial-author">
+                  <div className="author-avatar">👤</div>
+                  <div>
+                    <div className="author-name">Sarah Johnson</div>
+                    <div className="author-title">Wedding Guest</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* How It Works Section */}
+      {currentStep === 2 && (
+        <div className="how-it-works-section">
+          <div className="how-it-works-container">
+            <h3>How Our AI Finds Your Photos</h3>
+            <div className="ai-process">
+              <div className="process-step">
+                <div className="process-icon">📸</div>
+                <h4>Photo Upload</h4>
+                <p>Event organizer uploads all event photos to our secure platform</p>
+              </div>
+              <div className="process-arrow">→</div>
+              <div className="process-step">
+                <div className="process-icon">🤖</div>
+                <h4>AI Analysis</h4>
+                <p>Our AI scans every face in every photo with 99.8% accuracy</p>
+              </div>
+              <div className="process-arrow">→</div>
+              <div className="process-step">
+                <div className="process-icon">📧</div>
+                <h4>Smart Delivery</h4>
+                <p>You receive a personalized collection of all photos containing you</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default MultiStepForm;

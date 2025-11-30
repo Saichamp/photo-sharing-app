@@ -20,7 +20,7 @@ const upload = require('../middleware/upload');
 router.post(
   '/upload',
   authenticate,
-  checkQuota('storage'),
+  //checkQuota('storage'),
   uploadLimiter,
   upload.array('photos', 100), // Max 100 photos per upload
   photoController.uploadPhotos
@@ -85,5 +85,15 @@ router.get(
   validateObjectIdParam('eventId'),
   photoController.getPhotoStats
 );
+// backend/routes/photos.js
+
+// your existing photo routes, e.g.
+// router.post('/upload', authenticate, uploadMiddleware, photoController.uploadPhotos);
+// router.get('/event/:eventId', authenticate, photoController.getEventPhotos);
+
+// Matched photos route
+router.get('/matches/:registrationId', photoController.getMatchedPhotos);
+router.post('/batch-match/:eventId', authenticate, photoController.triggerBatchMatching);
 
 module.exports = router;
+

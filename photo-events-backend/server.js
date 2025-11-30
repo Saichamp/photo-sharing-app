@@ -213,3 +213,5 @@ startServer();
 
 // Export app for testing
 module.exports = app;
+const photoRoutes = require('./routes/photos');
+app.use('/api/photos', photoRoutes);

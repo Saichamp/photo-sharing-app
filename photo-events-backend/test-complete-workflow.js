@@ -92,7 +92,7 @@ async function runCompleteWorkflow() {
     const regTime = ((Date.now() - startReg) / 1000).toFixed(2);
     testRegistrationId = regResponse.data.data.registrationId;
 
-    console.log(`✅ User registered in ${regTime}s`);
+    console.log(` User registered in ${regTime}s`);
     console.log('   Registration ID:', testRegistrationId);
     console.log('   Name:', regResponse.data.data.name);
     console.log('   Face Processed:', regResponse.data.data.faceProcessed);

@@ -158,28 +158,43 @@ exports.login = asyncHandler(async (req, res, next) => {
  * @desc    Get current logged in user
  * @access  Private
  */
+/**
+ * @route GET /api/auth/me
+ * @desc Get current user profile
+ * @access Private
+ */
 exports.getMe = asyncHandler(async (req, res, next) => {
-  // User is already attached to req by authenticate middleware
-  const user = await User.findById(req.user.id);
+  // ✅ FIX: Check if user exists and has _id or id
+  if (!req.user) {
+    throw new AppError('User not authenticated', 401);
+  }
+
+  // Use _id (MongoDB default) or id (if using virtual)
+  const userId = req.user._id || req.user.id;
+  
+  if (!userId) {
+    throw new AppError('User ID not found', 500);
+  }
+
+  // Fetch fresh user data
+  const user = await User.findById(userId);
   
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new AppError('User no longer exists', 404);
   }
-  
+
   successResponse(res, {
     id: user._id,
     name: user.name,
     email: user.email,
     role: user.role,
-    subscription: user.subscription,
-    quota: user.quota,
     isEmailVerified: user.isEmailVerified,
-    lastLogin: user.lastLogin,
-    createdAt: user.createdAt,
-    quotaUsagePercent: user.quotaUsagePercent,
-    storageUsagePercent: user.storageUsagePercent
+    plan: user.plan,
+    quota: user.quota,
+    createdAt: user.createdAt
   }, 'User profile retrieved successfully');
 });
+
 
 /**
  * @route   PUT /api/auth/update-profile

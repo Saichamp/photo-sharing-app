@@ -1,5 +1,12 @@
+// src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate
+} from 'react-router-dom';
+
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { Loader } from './components/common/Loader';
@@ -10,9 +17,10 @@ import { RegisterPage } from './pages/Auth/RegisterPage';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 
-// Guest Registration Pages (Both versions available)
-import MultiStepForm from './components/MultiStepForm'; // OLD VERSION
-import GuestRegistration from './pages/Guest/GuestRegistration'; // NEW VERSION
+// Guest Registration Pages
+import MultiStepForm from './components/MultiStepForm';           // old version
+import GuestRegistration from './pages/Guest/GuestRegistration'; // new version
+import GuestGallery from './pages/Guest/GuestGallery';
 
 // Components
 import { Navbar } from './components/common/Navbar';
@@ -68,11 +76,23 @@ function AppRoutes() {
         />
 
         {/* Guest Registration Routes */}
-        {/* NEW: Beautiful redesigned version */}
-        <Route path="/event/register/:eventId" element={<GuestRegistration />} />
-        
-        {/* OLD: Keep existing version for backward compatibility */}
-        <Route path="/register/:eventId" element={<MultiStepForm />} />
+        {/* NEW: redesigned version */}
+        <Route
+          path="/event/register/:eventId"
+          element={<GuestRegistration />}
+        />
+
+        {/* OLD: Multi-step version */}
+        <Route
+          path="/register/:eventId"
+          element={<MultiStepForm />}
+        />
+
+        {/* Guest gallery – MultiStepForm / GuestRegistration navigate here */}
+        <Route
+          path="/guest/gallery/:registrationId"
+          element={<GuestGallery />}
+        />
 
         {/* Protected Routes */}
         <Route

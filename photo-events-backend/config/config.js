@@ -44,12 +44,12 @@ const config = {
 
   // Face Recognition Settings
   faceRecognition: {
-    matchThreshold: parseFloat(process.env.FACE_MATCH_THRESHOLD) || 0.4,
+    matchThreshold: parseFloat(process.env.FACE_MATCH_THRESHOLD) || 0.3,
     minFaceSize: parseInt(process.env.FACE_MIN_SIZE, 10) || 20,
     detectionConfidence: parseFloat(process.env.FACE_DETECTION_CONFIDENCE) || 0.5,
     maxFacesPerPhoto: parseInt(process.env.MAX_FACES_PER_PHOTO, 10) || 50,
     pythonPath: process.env.PYTHON_PATH || 'python3',
-    timeout: 30000 // 30 seconds
+    timeout: 10000 // 30 seconds
   },
 
   // Email Configuration
