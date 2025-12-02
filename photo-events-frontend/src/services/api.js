@@ -1,4 +1,5 @@
 // src/services/api.js
+
 import axios from 'axios';
 import authService from './authService';
 
@@ -9,7 +10,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api
  */
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 90000, // ✅ INCREASED: 90 seconds for face recognition operations
   headers: {
     'Content-Type': 'application/json'
   }
@@ -36,25 +37,24 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-
+    
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
+      
       try {
         const refreshToken = authService.getRefreshToken();
-
         if (!refreshToken) {
           throw new Error('No refresh token available');
         }
-
+        
         const { data } = await axios.post(
           `${API_BASE_URL}/auth/refresh-token`,
           { refreshToken }
         );
-
+        
         authService.setTokens(data.data.token, data.data.refreshToken);
-
         originalRequest.headers.Authorization = `Bearer ${data.data.token}`;
+        
         return api(originalRequest);
       } catch (refreshError) {
         authService.clearTokens();
@@ -62,7 +62,7 @@ api.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-
+    
     return Promise.reject(error);
   }
 );
@@ -94,13 +94,15 @@ export const eventAPI = {
 
 /**
  * Registration API endpoints
+ * ✅ Increased timeout for face recognition processing
  */
 export const registrationAPI = {
   register: (formData) =>
     api.post('/registrations/register', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      timeout: 90000 // ✅ 90 seconds for face processing
     }),
   getByEvent: (eventId) => api.get(`/registrations/event/${eventId}`),
   getByEmail: (email) => api.get(`/registrations/email/${email}`),
@@ -111,6 +113,7 @@ export const registrationAPI = {
 
 /**
  * Photo API endpoints
+ * ✅ Increased timeout for photo upload and processing
  */
 export const photoAPI = {
   upload: (formData, config = {}) =>
@@ -118,6 +121,7 @@ export const photoAPI = {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
+      timeout: 120000, // ✅ 2 minutes for photo upload with face matching
       ...config
     }),
   getByEvent: (eventId, params = {}) =>
@@ -138,7 +142,8 @@ export const faceAPI = {
     api.post(`/face/match/${eventId}`, faceData, {
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      timeout: 90000 // ✅ 90 seconds for face matching
     }),
   getMatchedPhotos: (registrationId) =>
     api.get(`/photos/matches/${registrationId}`)

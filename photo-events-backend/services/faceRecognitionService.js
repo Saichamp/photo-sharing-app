@@ -18,7 +18,7 @@ class FaceRecognitionService {
     // Configuration
     this.config = {
       matchThreshold: 0.4,  // Default matching threshold
-      timeout: 30000        // 30 second timeout
+      timeout: 120000        // 30 second timeout
     };
   }
 
@@ -50,105 +50,122 @@ class FaceRecognitionService {
    * Execute Python script with arguments
    * IMPROVED: Filters stdout to extract only JSON
    */
-  _executePython(args, inputData = null) {
-    return new Promise((resolve, reject) => {
-      console.log('🐍 Executing Python:', this.pythonPath, args.join(' '));
+_executePython(args, inputData = null) {
+  return new Promise((resolve, reject) => {
+    console.log('🐍 Executing Python:', this.pythonPath, args.join(' '));
+    
+    // ✅ ADD: Check if Python executable exists
+    const fs = require('fs');
+    if (!fs.existsSync(this.pythonPath)) {
+      reject(new Error(`Python executable not found at: ${this.pythonPath}`));
+      return;
+    }
+    
+    const python = spawn(this.pythonPath, [this.pythonScript, ...args], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      // ✅ ADD: Set working directory
+      cwd: path.join(__dirname, '..')
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let hasOutput = false;
+
+    python.stdout.on('data', (data) => {
+      stdout += data.toString();
+      hasOutput = true;
+      // ✅ ADD: Log progress for long-running operations
+      console.log('Python stdout:', data.toString().substring(0, 100));
+    });
+
+    python.stderr.on('data', (data) => {
+      stderr += data.toString();
+      hasOutput = true;
+      // ✅ IMPROVED: Log all stderr (includes model loading progress)
+      console.log('Python stderr:', data.toString());
+    });
+
+    // Timeout handling
+    const timeout = setTimeout(() => {
+      python.kill();
+      console.error('❌ Python script timeout after', this.config.timeout, 'ms');
+      console.error('Last stdout:', stdout.substring(0, 500));
+      console.error('Last stderr:', stderr.substring(0, 500));
+      reject(new Error(`Python script execution timeout after ${this.config.timeout}ms. Model may still be downloading.`));
+    }, this.config.timeout);
+
+    python.on('close', (code) => {
+      clearTimeout(timeout);
       
-      const python = spawn(this.pythonPath, [this.pythonScript, ...args], {
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
+      if (code !== 0) {
+        console.error('❌ Python script failed with code:', code);
+        console.error('stderr:', stderr);
+        console.error('stdout:', stdout);
+        reject(new Error(`Python script exited with code ${code}: ${stderr || 'No error message'}`));
+        return;
+      }
 
-      let stdout = '';
-      let stderr = '';
+      try {
+        // Extract JSON from output
+        const lines = stdout.split('\n');
+        let jsonLine = '';
 
-      python.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      python.stderr.on('data', (data) => {
-        stderr += data.toString();
-        // Log Python errors/warnings to console
-        if (data.toString().includes('Error') || data.toString().includes('error')) {
-          console.log('Python stderr:', data.toString());
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('{') && trimmed.includes('"success"')) {
+            jsonLine = trimmed;
+            break;
+          }
         }
-      });
 
-      // Timeout handling
-      const timeout = setTimeout(() => {
-        python.kill();
-        reject(new Error('Python script execution timeout'));
-      }, this.config.timeout);
+        if (!jsonLine) {
+          const jsonMatch = stdout.match(/\{[\s\S]*"success"[\s\S]*\}/);
+          if (jsonMatch) {
+            jsonLine = jsonMatch[0];
+          }
+        }
 
-      python.on('close', (code) => {
-        clearTimeout(timeout);
-        
-        if (code !== 0) {
-          console.error('❌ Python script failed with code:', code);
-          console.error('stderr:', stderr);
-          reject(new Error(`Python script exited with code ${code}: ${stderr}`));
+        if (!jsonLine) {
+          console.error('❌ No valid JSON found in output');
+          console.error('Full stdout:', stdout);
+          console.error('Full stderr:', stderr);
+          reject(new Error('No valid JSON found in Python output. Check Python script.'));
           return;
         }
 
-        try {
-          // CRITICAL FIX: Extract JSON from mixed output
-          // Look for lines starting with { or containing "success"
-          const lines = stdout.split('\n');
-          let jsonLine = '';
-          
-          // Find the line that looks like JSON
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('{') && trimmed.includes('"success"')) {
-              jsonLine = trimmed;
-              break;
-            }
-          }
-          
-          if (!jsonLine) {
-            // Fallback: try to find JSON in the entire output
-            const jsonMatch = stdout.match(/\{[\s\S]*"success"[\s\S]*\}/);
-            if (jsonMatch) {
-              jsonLine = jsonMatch[0];
-            }
-          }
-          
-          if (!jsonLine) {
-            console.error('❌ No valid JSON found in output');
-            console.error('stdout:', stdout.substring(0, 500));
-            reject(new Error('No valid JSON found in Python output'));
-            return;
-          }
-          
-          const result = JSON.parse(jsonLine);
-          
-          if (!result.success) {
-            reject(new Error(result.error || 'Unknown Python error'));
-            return;
-          }
-          
-          console.log('✅ Python script succeeded');
-          resolve(result);
-        } catch (e) {
-          console.error('❌ Failed to parse JSON from output');
-          console.error('Error:', e.message);
-          console.error('stdout (first 500 chars):', stdout.substring(0, 500));
-          reject(new Error(`Failed to parse Python output: ${e.message}`));
+        const result = JSON.parse(jsonLine);
+        
+        if (!result.success) {
+          reject(new Error(result.error || 'Unknown Python error'));
+          return;
         }
-      });
 
-      python.on('error', (error) => {
-        clearTimeout(timeout);
-        console.error('❌ Failed to start Python process:', error);
-        reject(new Error(`Failed to start Python process: ${error.message}`));
-      });
-
-      // Send input data if provided
-      if (inputData) {
-        python.stdin.write(JSON.stringify(inputData));
-        python.stdin.end();
+        console.log('✅ Python script succeeded');
+        resolve(result);
+        
+      } catch (e) {
+        console.error('❌ Failed to parse JSON from output');
+        console.error('Parse error:', e.message);
+        console.error('stdout:', stdout.substring(0, 1000));
+        reject(new Error(`Failed to parse Python output: ${e.message}`));
       }
     });
-  }
+
+    python.on('error', (error) => {
+      clearTimeout(timeout);
+      console.error('❌ Failed to start Python process:', error);
+      console.error('Python path:', this.pythonPath);
+      console.error('Script path:', this.pythonScript);
+      reject(new Error(`Failed to start Python process: ${error.message}. Check Python installation.`));
+    });
+
+    // Send input data if provided
+    if (inputData) {
+      python.stdin.write(JSON.stringify(inputData));
+      python.stdin.end();
+    }
+  });
+}
 
 
   /**
