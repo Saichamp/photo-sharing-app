@@ -1,6 +1,7 @@
 /**
  * File Upload Middleware using Multer
  * Handles photo uploads with validation
+ * Separate configurations for selfies and event photos
  */
 
 const multer = require('multer');
@@ -12,28 +13,40 @@ const { AppError } = require('./errorHandler');
 const fs = require('fs');
 const uploadDir = config.upload.uploadDir || './uploads';
 const photosDir = path.join(uploadDir, 'photos');
-const facesDir = path.join(uploadDir, 'faces');
+const selfiesDir = path.join(uploadDir, 'selfies'); // ✅ NEW: Separate folder for selfies
 
-[uploadDir, photosDir, facesDir].forEach(dir => {
+[uploadDir, photosDir, selfiesDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
 
 /**
- * Storage Configuration
+ * ✅ Storage Configuration for EVENT PHOTOS
  */
-const storage = multer.diskStorage({
+const photoStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Store photos in photos subdirectory
-    cb(null, photosDir);
+    cb(null, photosDir); // Event photos → uploads/photos
   },
   filename: function (req, file, cb) {
-    // Generate unique filename: timestamp-random-originalname
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     const basename = path.basename(file.originalname, ext);
-    cb(null, basename + '-' + uniqueSuffix + ext);
+    cb(null, `photo-${uniqueSuffix}${ext}`); // ✅ Prefix: photo-
+  }
+});
+
+/**
+ * ✅ Storage Configuration for SELFIES (Guest Registration)
+ */
+const selfieStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, selfiesDir); // Selfies → uploads/selfies
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `selfie-${uniqueSuffix}${ext}`); // ✅ Prefix: selfie-
   }
 });
 
@@ -47,7 +60,7 @@ const fileFilter = (req, file, cb) => {
     'image/png',
     'image/webp'
   ];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -56,14 +69,26 @@ const fileFilter = (req, file, cb) => {
 };
 
 /**
- * Multer Upload Instance
+ * ✅ Multer Upload Instance for EVENT PHOTOS (bulk upload)
  */
-const upload = multer({
-  storage: storage,
+const uploadPhotos = multer({
+  storage: photoStorage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: config.upload.maxFileSize || 10485760, // 10MB default
+    fileSize: config.upload.maxFileSize || 10485760, // 10MB
     files: config.upload.maxFiles || 100
+  }
+});
+
+/**
+ * ✅ Multer Upload Instance for SELFIES (single file)
+ */
+const uploadSelfie = multer({
+  storage: selfieStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5242880, // 5MB for selfies
+    files: 1 // Only 1 selfie per registration
   }
 });
 
@@ -86,8 +111,9 @@ const handleMulterError = (err, req, res, next) => {
   next(err);
 };
 
-// Export multer instance directly (NOT wrapped in object)
-module.exports = upload;
-
-// Also export error handler
-module.exports.handleMulterError = handleMulterError;
+// ✅ Export both upload configurations
+module.exports = {
+  uploadPhotos,   // For bulk event photo uploads
+  uploadSelfie,   // For guest registration selfies
+  handleMulterError
+};

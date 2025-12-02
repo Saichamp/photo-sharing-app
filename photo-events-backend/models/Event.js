@@ -139,11 +139,16 @@ eventSchema.methods.incrementRegistration = async function() {
 /**
  * Instance Method: Increment photo count and storage
  */
-eventSchema.methods.incrementPhotoStats = async function(fileSize) {
-  this.photosUploaded += 1;
+/**
+ * Instance Method: Increment photo count and storage
+ * ✅ FIXED: Now accepts count parameter
+ */
+eventSchema.methods.incrementPhotoStats = async function(fileSize, count = 1) {
+  this.photosUploaded += count; // ✅ Add count, not just 1
   this.storageUsed += fileSize;
   await this.save();
 };
+
 
 /**
  * Instance Method: Update status based on date

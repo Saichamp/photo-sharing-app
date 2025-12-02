@@ -137,16 +137,13 @@ export const photoAPI = {
 /**
  * Face matching API endpoints
  */
+
+
+
 export const faceAPI = {
-  matchFaces: (eventId, faceData) =>
-    api.post(`/face/match/${eventId}`, faceData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      timeout: 90000 // ✅ 90 seconds for face matching
-    }),
-  getMatchedPhotos: (registrationId) =>
-    api.get(`/photos/matches/${registrationId}`)
+  getMatchedPhotos: async (registrationId) => {
+    return api.post('/api/photos/find-matches', { registrationId });
+  }
 };
 
 export default api;

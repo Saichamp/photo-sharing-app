@@ -296,3 +296,31 @@
     font-size: 0.875rem;
   }
 }
+/* ✅ Fix for photo upload section layout */
+.dashboard-main > div {
+  width: 100%;
+}
+
+/* ✅ Ensure proper spacing */
+.photo-upload-container + div {
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid #eee;
+}
+
+/* ✅ Fix for broken sidebar */
+.dashboard-sidebar {
+  min-width: 200px;
+  width: 200px;
+}
+
+.dashboard-content {
+  display: flex;
+  gap: 30px;
+  margin-top: 30px;
+}
+
+.dashboard-main {
+  flex: 1;
+  min-width: 0; /* ✅ Prevents overflow */
+}

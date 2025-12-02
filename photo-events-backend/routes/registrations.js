@@ -8,7 +8,7 @@ const router = express.Router();
 const registrationController = require('../controllers/registrationController');
 const { registrationLimiter } = require('../middleware/rateLimiter');
 const { validateBody } = require('../utils/validators');
-const upload = require('../middleware/upload');
+const { uploadSelfie, handleMulterError } = require('../middleware/upload'); // ✅ FIXED: Destructured import
 
 /**
  * @route   POST /api/registrations/register
@@ -19,7 +19,8 @@ const upload = require('../middleware/upload');
 router.post(
   '/register',
   registrationLimiter,
-  upload.single('selfie'),
+  uploadSelfie.single('selfie'), // ✅ FIXED: Use uploadSelfie
+  handleMulterError, // ✅ ADDED: Handle multer errors
   validateBody('registration'),
   registrationController.registerGuest
 );
@@ -33,7 +34,8 @@ router.post(
 router.post(
   '/',
   registrationLimiter,
-  upload.single('selfie'),
+  uploadSelfie.single('selfie'), // ✅ FIXED: Use uploadSelfie
+  handleMulterError, // ✅ ADDED: Handle multer errors
   validateBody('registration'),
   registrationController.registerGuest
 );
@@ -56,6 +58,26 @@ router.get(
 router.get(
   '/:id',
   registrationController.getRegistrationById
+);
+
+/**
+ * @route   PUT /api/registrations/:id
+ * @desc    Update registration details
+ * @access  Public (with email verification in future)
+ */
+router.put(
+  '/:id',
+  registrationController.updateRegistration
+);
+
+/**
+ * @route   DELETE /api/registrations/:id
+ * @desc    Delete a registration
+ * @access  Public (with email verification in future)
+ */
+router.delete(
+  '/:id',
+  registrationController.deleteRegistration
 );
 
 module.exports = router;

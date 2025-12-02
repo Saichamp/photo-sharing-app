@@ -11,7 +11,7 @@ const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const { AppError, asyncHandler, successResponse } = require('../middleware/errorHandler');
 const { logFile, logAI, logger } = require('../utils/logger');
-const faceRecognitionService = require('../services/faceRecognitionService');
+const faceRecognitionService = require('../services/faceRecognition/faceRecognitionWrapper');
 const { isValidObjectId } = require('../utils/validators');
 
 
@@ -48,7 +48,10 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   // 4. Process Files Safely
   for (const file of req.files) {
     try {
-      const url = `${req.protocol}://${req.get('host')}/${file.path.replace(/\\/g, '/')}`;
+      // ✅ NEW (fixes Windows paths):
+const relativePath = file.path.replace(/\\/g, '/').replace(/^uploads[\\/]/, '');
+const url = `${req.protocol}://${req.get('host')}/uploads/${relativePath}`;
+
       
       const photo = await Photo.create({
         eventId,
@@ -98,22 +101,33 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   }
 
   // 5. Update Stats (Now 'event' is defined!)
-  if (totalUploadedSize > 0) {
-    // Update event stats
-    if (typeof event.incrementPhotoStats === 'function') {
-      await event.incrementPhotoStats(totalUploadedSize);
-    } else {
-      // Fallback manual update if method missing
-      event.photosUploaded = (event.photosUploaded || 0) + createdPhotos.length;
-      event.storageUsed = (event.storageUsed || 0) + totalUploadedSize;
-      await event.save();
-    }
-
-    // Update user quota
-    if (req.user && typeof req.user.incrementStorageUsage === 'function') {
-      await req.user.incrementStorageUsage(totalUploadedSize);
-    }
+ // 5. Update Stats
+if (totalUploadedSize > 0) {
+  // ✅ FIXED: Pass photo count as second parameter
+  if (typeof event.incrementPhotoStats === 'function') {
+    await event.incrementPhotoStats(totalUploadedSize, createdPhotos.length);
+  } else {
+    // Fallback manual update if method missing
+    event.photosUploaded = (event.photosUploaded || 0) + createdPhotos.length;
+    event.storageUsed = (event.storageUsed || 0) + totalUploadedSize;
+    await event.save();
   }
+
+  // Update user quota
+  if (req.user && typeof req.user.incrementStorageUsage === 'function') {
+    await req.user.incrementStorageUsage(totalUploadedSize);
+  }
+}
+
+console.log(`✅ Updated event stats: ${createdPhotos.length} photos added`); // ✅ Add logging
+
+successResponse(res, {
+  photos: createdPhotos.map(p => ({ id: p._id, filename: p.filename })),
+  uploaded: createdPhotos.length,
+  failed: errors.length,
+  errors
+}, 'Photos processed', 201);
+
 
   successResponse(res, {
     photos: createdPhotos.map(p => ({ id: p._id, filename: p.filename })),
@@ -622,4 +636,94 @@ exports.triggerBatchMatching = asyncHandler(async (req, res, next) => {
     totalPhotos: photos.length, 
     photosWithMatches: matched 
   }, 'Batch matching completed');
+});
+
+
+/**
+ * @desc Get matched photos for a guest (Phase 4)
+ * @route POST /api/photos/find-matches
+ * @access Public
+ */
+exports.findGuestPhotos = asyncHandler(async (req, res, next) => {
+  const { registrationId } = req.body;
+
+  if (!isValidObjectId(registrationId)) {
+    throw new AppError('Invalid registration ID', 400);
+  }
+
+  // Get registration with face embedding
+  const registration = await Registration.findById(registrationId);
+  if (!registration) {
+    throw new AppError('Registration not found', 404);
+  }
+
+  if (!registration.faceEmbedding) {
+    throw new AppError('No face data found for this registration', 400);
+  }
+
+  // Get all event photos with faces
+  const photos = await Photo.find({
+    eventId: registration.eventId,
+    processed: true,
+    'faces.0': { $exists: true }
+  }).select('_id faces url filename uploadedAt');
+
+  if (photos.length === 0) {
+    return successResponse(res, {
+      photos: [],
+      count: 0,
+      message: 'No photos available yet'
+    }, 'No photos found');
+  }
+
+  // Prepare photo data for matching
+  const photoData = photos.map(p => ({
+    id: p._id.toString(),
+    faces: p.faces
+  }));
+
+  logger.info('Starting face matching', {
+    registrationId,
+    totalPhotos: photos.length,
+    totalFaces: photoData.reduce((sum, p) => sum + p.faces.length, 0)
+  });
+
+  // Call Python service to find matches
+  const result = await faceRecognitionService.findMatchingPhotos(
+    registration.faceEmbedding,
+    photoData
+  );
+
+  if (!result.success) {
+    throw new AppError('Face matching failed: ' + result.error, 500);
+  }
+
+  // Get unique photo IDs from matches
+  const matchedPhotoIds = [...new Set(
+    result.matched_photos.map(m => m.photo_id)
+  )];
+
+  // Fetch full photo details
+  const matchedPhotos = await Photo.find({
+    _id: { $in: matchedPhotoIds }
+  }).select('_id url filename uploadedAt size');
+
+  logger.info('Matching complete', {
+    registrationId,
+    matchedPhotos: matchedPhotos.length,
+    totalMatches: result.total_matches
+  });
+
+  successResponse(res, {
+    photos: matchedPhotos.map(p => ({
+      id: p._id,
+      url: p.url,
+      filename: p.filename,
+      uploadedAt: p.uploadedAt,
+      matches: result.matched_photos.filter(m => m.photo_id === p._id.toString())
+    })),
+    count: matchedPhotos.length,
+    totalMatches: result.total_matches,
+    guestName: registration.name
+  }, 'Matched photos retrieved successfully');
 });

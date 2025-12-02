@@ -7,7 +7,7 @@ const Registration = require('../models/Registration');
 const Event = require('../models/Event');
 const { AppError, asyncHandler, successResponse } = require('../middleware/errorHandler');
 const { logDatabase, logFile, logger } = require('../utils/logger');
-const faceRecognitionService = require('../services/faceRecognitionService');
+const faceRecognitionService = require('../services/faceRecognition/faceRecognitionWrapper');
 const { isValidObjectId } = require('../utils/validators');
 const path = require('path');
 
@@ -47,24 +47,27 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
 
   if (req.file) {
     selfiePath = req.file.path;
-    try {
-      // Extract face from selfie
-      const result = await faceRecognitionService.extractFaces(selfiePath);
 
-      if (result.success && result.faces && result.faces.length > 0) {
-        faceEmbedding = result.faces[0].embedding;
+    try {
+      // Use InsightFace-based selfie extractor
+      const result = await faceRecognitionService.extractFaceFromSelfie(selfiePath);
+
+      if (result.success && result.embedding) {
+        faceEmbedding = result.embedding;
         logFile('selfie-upload', req.file.filename, {
           registrationEmail: email,
           eventId
         });
       } else {
-        // Delete file if no face detected
         const fs = require('fs').promises;
         await fs.unlink(selfiePath).catch(() => {});
-        throw new AppError('No face detected in selfie. Please upload a clear photo.', 400);
+        throw new AppError(
+          'Face detection failed: ' +
+            (result.error || 'No face detected in selfie. Please upload a clear photo.'),
+          400
+        );
       }
     } catch (error) {
-      // Clean up file on error
       const fs = require('fs').promises;
       await fs.unlink(selfiePath).catch(() => {});
       throw new AppError('Face detection failed: ' + error.message, 500);
@@ -97,15 +100,20 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
     hasFaceData: !!faceEmbedding
   });
 
-  successResponse(res, {
-    id: registration._id,
-    name: registration.name,
-    email: registration.email,
-    eventName: event.name,
-    eventDate: event.date,
-    qrCode: event.qrCode,
-    hasFaceRecognition: !!faceEmbedding
-  }, 'Registration successful', 201);
+  successResponse(
+    res,
+    {
+      id: registration._id,
+      name: registration.name,
+      email: registration.email,
+      eventName: event.name,
+      eventDate: event.date,
+      qrCode: event.qrCode,
+      hasFaceRecognition: !!faceEmbedding
+    },
+    'Registration successful',
+    201
+  );
 });
 
 /**
@@ -138,15 +146,19 @@ exports.getEventRegistrations = asyncHandler(async (req, res, next) => {
 
   const total = await Registration.countDocuments({ eventId });
 
-  successResponse(res, {
-    registrations,
-    pagination: {
-      total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      limit: parseInt(limit)
-    }
-  }, 'Registrations retrieved successfully');
+  successResponse(
+    res,
+    {
+      registrations,
+      pagination: {
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+        limit: parseInt(limit)
+      }
+    },
+    'Registrations retrieved successfully'
+  );
 });
 
 /**
@@ -160,8 +172,7 @@ exports.getRegistrationById = asyncHandler(async (req, res, next) => {
     throw new AppError('Invalid registration ID', 400);
   }
 
-  const registration = await Registration.findById(req.params.id)
-    .select('-faceEmbedding');
+  const registration = await Registration.findById(req.params.id).select('-faceEmbedding');
 
   if (!registration) {
     throw new AppError('Registration not found', 404);
@@ -170,15 +181,19 @@ exports.getRegistrationById = asyncHandler(async (req, res, next) => {
   // Get event details
   const event = await Event.findById(registration.eventId);
 
-  successResponse(res, {
-    registration,
-    event: {
-      id: event._id,
-      name: event.name,
-      date: event.date,
-      location: event.location
-    }
-  }, 'Registration retrieved successfully');
+  successResponse(
+    res,
+    {
+      registration,
+      event: {
+        id: event._id,
+        name: event.name,
+        date: event.date,
+        location: event.location
+      }
+    },
+    'Registration retrieved successfully'
+  );
 });
 
 /**

@@ -1,99 +1,100 @@
 /**
  * Photo Routes for PhotoManEa
- * Handles photo upload, retrieval, and management
+ * Handles photo uploads and management
  */
 
 const express = require('express');
 const router = express.Router();
 const photoController = require('../controllers/photoController');
-const { authenticate, optionalAuth, checkQuota } = require('../middleware/authenticate');
-const { uploadLimiter } = require('../middleware/rateLimiter');
-const { validateObjectIdParam } = require('../utils/validators');
-const upload = require('../middleware/upload');
+const { authenticate } = require('../middleware/authenticate');
+const { uploadPhotos, handleMulterError } = require('../middleware/upload'); // ✅ FIXED: Destructured import
 
 /**
  * @route   POST /api/photos/upload
- * @desc    Upload photos to an event
- * @access  Private (Event owner only)
- * @rateLimit 50 uploads per hour
+ * @desc    Upload photos to an event (bulk upload)
+ * @access  Private (requires authentication)
  */
 router.post(
   '/upload',
   authenticate,
-  //checkQuota('storage'),
-  uploadLimiter,
-  upload.array('photos', 100), // Max 100 photos per upload
+  uploadPhotos.array('photos', 100), // ✅ FIXED: Use uploadPhotos for multiple files
+  handleMulterError, // ✅ ADDED: Handle multer errors
   photoController.uploadPhotos
 );
 
 /**
  * @route   GET /api/photos/event/:eventId
  * @desc    Get all photos for an event
- * @access  Private (Event owner) or Public with valid registration
+ * @access  Private or Public with registration
  */
 router.get(
   '/event/:eventId',
-  optionalAuth,
-  validateObjectIdParam('eventId'),
   photoController.getEventPhotos
+);
+
+/**
+ * @route   GET /api/photos/event/:eventId/stats
+ * @desc    Get photo statistics for an event
+ * @access  Private (requires authentication)
+ */
+router.get(
+  '/event/:eventId/stats',
+  authenticate,
+  photoController.getPhotoStats
+);
+
+/**
+ * @route   GET /api/photos/matches/:registrationId
+ * @desc    Get photos matched to a specific registration (guest gallery)
+ * @access  Public
+ */
+router.get(
+  '/matches/:registrationId',
+  photoController.getMatchedPhotos
 );
 
 /**
  * @route   GET /api/photos/:id
  * @desc    Get single photo by ID
- * @access  Private or Public with registration
+ * @access  Private or Public
  */
 router.get(
   '/:id',
-  optionalAuth,
-  validateObjectIdParam('id'),
   photoController.getPhotoById
 );
 
 /**
  * @route   DELETE /api/photos/:id
- * @desc    Delete photo
- * @access  Private (Event owner only)
+ * @desc    Delete a photo
+ * @access  Private (requires authentication)
  */
 router.delete(
   '/:id',
   authenticate,
-  validateObjectIdParam('id'),
   photoController.deletePhoto
 );
 
 /**
  * @route   POST /api/photos/process/:photoId
  * @desc    Manually trigger face processing for a photo
- * @access  Private (Event owner only)
+ * @access  Private (requires authentication)
  */
 router.post(
   '/process/:photoId',
   authenticate,
-  validateObjectIdParam('photoId'),
   photoController.processPhotoFaces
 );
 
 /**
- * @route   GET /api/photos/event/:eventId/stats
- * @desc    Get photo statistics for an event
- * @access  Private (Event owner only)
+ * @route   POST /api/photos/batch-match/:eventId
+ * @desc    Trigger batch face matching for all photos in an event
+ * @access  Private (requires authentication)
  */
-router.get(
-  '/event/:eventId/stats',
+router.post(
+  '/batch-match/:eventId',
   authenticate,
-  validateObjectIdParam('eventId'),
-  photoController.getPhotoStats
+  photoController.triggerBatchMatching
 );
-// backend/routes/photos.js
-
-// your existing photo routes, e.g.
-// router.post('/upload', authenticate, uploadMiddleware, photoController.uploadPhotos);
-// router.get('/event/:eventId', authenticate, photoController.getEventPhotos);
-
-// Matched photos route
-router.get('/matches/:registrationId', photoController.getMatchedPhotos);
-router.post('/batch-match/:eventId', authenticate, photoController.triggerBatchMatching);
+router.post('/find-matches', photoController.findGuestPhotos);
 
 module.exports = router;
-
