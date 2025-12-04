@@ -137,13 +137,20 @@ export const photoAPI = {
 /**
  * Face matching API endpoints
  */
-
-
-
+/**
+ * Face matching API endpoints
+ 
 export const faceAPI = {
   getMatchedPhotos: async (registrationId) => {
-    return api.post('/api/photos/find-matches', { registrationId });
+    return api.post('/face-matching/find-by-registration', { registrationId });
   }
+};*/
+
+// Face matching API endpoints
+export const faceAPI = {
+  getMatchedPhotos: (registrationId) =>
+    api.post('/face-matching/find-by-registration', { registrationId }),
 };
+
 
 export default api;

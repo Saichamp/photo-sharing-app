@@ -128,8 +128,120 @@ const findMatchingPhotos = async (req, res) => {
   }
 };
 
+/**
+ * Find photos for an already-registered user
+ * Uses the saved face embedding from registration
+ */
+const findPhotosForRegistration = async (req, res) => {
+  try {
+    const { registrationId } = req.body;
+
+    if (!registrationId) {
+      return res.status(400).json({ error: 'Registration ID is required' });
+    }
+
+    console.log('🔍 Finding photos for registration:', registrationId);
+
+    // Get registration with face embedding
+    const registration = await Registration.findById(registrationId);
+    
+    if (!registration) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+
+    if (!registration.faceEmbedding) {
+      return res.status(400).json({ 
+        error: 'No face data found. Please register with a selfie.' 
+      });
+    }
+
+    console.log('✅ Registration found:', registration.name);
+    console.log('📊 Face embedding length:', registration.faceEmbedding.length);
+
+    // Get all processed photos for this event
+    const photos = await Photo.find({
+      eventId: registration.eventId,
+      processed: true,
+      'faces.0': { $exists: true }
+    });
+
+    console.log(`📸 Found ${photos.length} processed photos with faces`);
+
+    if (photos.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No photos uploaded yet for this event',
+        matches: [],
+        totalPhotos: 0,
+        totalMatches: 0,
+        guestName: registration.name
+      });
+    }
+
+    // Prepare photos with face data for matching
+    const eventPhotos = photos.map(photo => ({
+      id: photo._id.toString(),
+      url: photo.url,
+      filename: photo.filename,
+      uploadedAt: photo.uploadedAt,
+      faces: photo.faces
+    }));
+
+    console.log(`🤖 Matching against ${eventPhotos.length} photos...`);
+
+    // Use face recognition service to find matches
+ // Use face recognition service to find matches
+const matchResult = await faceRecognitionService.findMatchingPhotos(
+  registration.faceEmbedding,
+  eventPhotos
+);
+
+
+    if (!matchResult.success) {
+      throw new Error(matchResult.error || 'Face matching failed');
+    }
+
+    console.log(`✨ Found ${matchResult.total_matches} matches`);
+
+    // Enhance results with photo details
+    const matchedPhotos = matchResult.matched_photos.map(match => {
+      const photo = photos.find(p => p._id.toString() === match.photo_id);
+      return {
+        photoId: match.photo_id,
+        url: photo?.url,
+        filename: photo?.filename,
+        uploadedAt: photo?.uploadedAt,
+        similarity: match.similarity,
+        faceIndex: match.face_index,
+        distance: match.distance
+      };
+    });
+
+    // Sort by similarity (highest first)
+    matchedPhotos.sort((a, b) => b.similarity - a.similarity);
+
+    res.json({
+      success: true,
+      message: `Found ${matchedPhotos.length} photos containing you!`,
+      matches: matchedPhotos,
+      totalPhotos: photos.length,
+      totalMatches: matchedPhotos.length,
+      guestName: registration.name,
+      eventId: registration.eventId
+    });
+
+  } catch (error) {
+    console.error('❌ Find photos error:', error);
+    res.status(500).json({ 
+      error: 'Failed to find matching photos',
+      details: error.message 
+    });
+  }
+};
+
 module.exports = {
   upload,
   testFaceMatching,
-  findMatchingPhotos
+  findMatchingPhotos,
+  findPhotosForRegistration
 };

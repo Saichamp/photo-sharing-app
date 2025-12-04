@@ -13,9 +13,11 @@ const GuestGallery = () => {
       try {
         setLoading(true);
         setError('');
-        const res = await faceAPI.getMatchedPhotos(registrationId);
-        const data = res.data?.data || res.data;
-        setPhotos(data?.photos || []);
+     const res = await faceAPI.getMatchedPhotos(registrationId);
+const data = res.data?.data || res.data;
+console.log('🔍 API Response:', data);  // Debug log
+setPhotos(data?.matches || data?.photos || []);  // ✅ Try 'matches' first
+
       } catch (err) {
         setError(
           err.response?.data?.message || 'Failed to load your photos'
@@ -38,11 +40,15 @@ const GuestGallery = () => {
         <p>We don&apos;t have any photos for you yet. Please check again after the organizer uploads and processes event photos.</p>
       ) : (
         <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-          {photos.map((photo) => (
-            <div key={photo.id}>
-              <img src={photo.url || photo.path} alt="" style={{ width: '100%', borderRadius: '8px' }} />
-            </div>
-          ))}
+        {photos.map((photo) => (
+  <div key={photo.photoId || photo.id || photo._id}>
+    <img 
+      src={photo.url || photo.path} 
+      alt="" 
+      style={{ width: '100%', borderRadius: '8px' }} 
+    />
+  </div>
+))}
         </div>
       )}
     </div>

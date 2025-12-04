@@ -12,9 +12,9 @@ const { isValidObjectId } = require('../utils/validators');
 const path = require('path');
 
 /**
- * @desc    Register guest for an event
- * @route   POST /api/registrations
- * @access  Public
+ * @desc Register guest for an event
+ * @route POST /api/registrations
+ * @access Public
  */
 exports.registerGuest = asyncHandler(async (req, res, next) => {
   const { eventId, name, email, phone } = req.body;
@@ -49,14 +49,15 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
     selfiePath = req.file.path;
 
     try {
-      // Use InsightFace-based selfie extractor
+      // Use InsightFace-based selfie extractor (buffalo_l)
       const result = await faceRecognitionService.extractFaceFromSelfie(selfiePath);
 
       if (result.success && result.embedding) {
         faceEmbedding = result.embedding;
+
         logFile('selfie-upload', req.file.filename, {
           registrationEmail: email,
-          eventId
+          eventId,
         });
       } else {
         const fs = require('fs').promises;
@@ -81,7 +82,7 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
     email,
     phone,
     faceEmbedding,
-    selfiePath
+    selfiePath,
   });
 
   // Increment event registration count
@@ -90,14 +91,14 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
   logDatabase('CREATE', 'registrations', {
     registrationId: registration._id,
     eventId,
-    email
+    email,
   });
 
   logger.info('Guest registered', {
     registrationId: registration._id,
     eventId,
     email,
-    hasFaceData: !!faceEmbedding
+    hasFaceData: !!faceEmbedding,
   });
 
   successResponse(
@@ -109,7 +110,7 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
       eventName: event.name,
       eventDate: event.date,
       qrCode: event.qrCode,
-      hasFaceRecognition: !!faceEmbedding
+      hasFaceRecognition: !!faceEmbedding,
     },
     'Registration successful',
     201
@@ -117,9 +118,9 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * @desc    Get all registrations for an event
- * @route   GET /api/registrations/event/:eventId
- * @access  Public (will be protected in Phase 3)
+ * @desc Get all registrations for an event
+ * @route GET /api/registrations/event/:eventId
+ * @access Public (will be protected in Phase 3)
  */
 exports.getEventRegistrations = asyncHandler(async (req, res, next) => {
   const { eventId } = req.params;
@@ -154,17 +155,17 @@ exports.getEventRegistrations = asyncHandler(async (req, res, next) => {
         total,
         page: parseInt(page),
         pages: Math.ceil(total / limit),
-        limit: parseInt(limit)
-      }
+        limit: parseInt(limit),
+      },
     },
     'Registrations retrieved successfully'
   );
 });
 
 /**
- * @desc    Get single registration by ID
- * @route   GET /api/registrations/:id
- * @access  Public
+ * @desc Get single registration by ID
+ * @route GET /api/registrations/:id
+ * @access Public
  */
 exports.getRegistrationById = asyncHandler(async (req, res, next) => {
   // Validate registration ID
@@ -173,7 +174,6 @@ exports.getRegistrationById = asyncHandler(async (req, res, next) => {
   }
 
   const registration = await Registration.findById(req.params.id).select('-faceEmbedding');
-
   if (!registration) {
     throw new AppError('Registration not found', 404);
   }
@@ -189,17 +189,17 @@ exports.getRegistrationById = asyncHandler(async (req, res, next) => {
         id: event._id,
         name: event.name,
         date: event.date,
-        location: event.location
-      }
+        location: event.location,
+      },
     },
     'Registration retrieved successfully'
   );
 });
 
 /**
- * @desc    Update registration
- * @route   PUT /api/registrations/:id
- * @access  Public (with email verification in future)
+ * @desc Update registration
+ * @route PUT /api/registrations/:id
+ * @access Public (with email verification in future)
  */
 exports.updateRegistration = asyncHandler(async (req, res, next) => {
   const { name, phone } = req.body;
@@ -222,16 +222,16 @@ exports.updateRegistration = asyncHandler(async (req, res, next) => {
 
   logger.info('Registration updated', {
     registrationId: registration._id,
-    updatedFields: Object.keys(req.body)
+    updatedFields: Object.keys(req.body),
   });
 
   successResponse(res, registration, 'Registration updated successfully');
 });
 
 /**
- * @desc    Delete registration
- * @route   DELETE /api/registrations/:id
- * @access  Public (with email verification in future)
+ * @desc Delete registration
+ * @route DELETE /api/registrations/:id
+ * @access Public (with email verification in future)
  */
 exports.deleteRegistration = asyncHandler(async (req, res, next) => {
   // Validate registration ID
@@ -263,7 +263,7 @@ exports.deleteRegistration = asyncHandler(async (req, res, next) => {
 
   logger.info('Registration deleted', {
     registrationId: registration._id,
-    eventId
+    eventId,
   });
 
   successResponse(res, null, 'Registration deleted successfully');

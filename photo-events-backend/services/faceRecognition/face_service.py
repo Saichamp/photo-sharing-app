@@ -1,220 +1,196 @@
+#!/usr/bin/env python3
 """
-Face Recognition Service using InsightFace
-TESTED and WORKING based on test_multiple_photos_BALANCED.py
+Face Recognition Service for PhotoManEa
+Handles face detection, embedding extraction, and matching
 """
 
-import os
 import sys
 import json
 import cv2
 import numpy as np
-
-# ========================================================================
-# Redirect stdout so ONLY JSON goes to Node
-# All other logs (InsightFace model loading, debug) go to stderr
-# ========================================================================
-
-class StdoutToStderr:
-    def write(self, s):
-        sys.stderr.write(s)
-    def flush(self):
-        sys.stderr.flush()
-
-# Redirect prints used by libraries to stderr
-sys.stdout = StdoutToStderr()
-
 from insightface.app import FaceAnalysis
 
-# ========================================================================
-# Initialize InsightFace (same config as your tests)
-# ========================================================================
+app = None
 
-print("🔧 Loading InsightFace buffalo_l model...", file=sys.stderr)
 
-app = FaceAnalysis(
-    name='buffalo_l',           # Best accuracy model
-    providers=['CPUExecutionProvider']
-)
+def initialize_model():
+  """Initialize the face recognition model"""
+  global app
+  if app is None:
+      print("[Python] Loading InsightFace model...", file=sys.stderr)
+      app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+      app.prepare(ctx_id=-1, det_size=(640, 640))
+      print("[Python] Model loaded successfully!", file=sys.stderr)
+  return app
 
-app.prepare(
-    ctx_id=-1,
-    det_size=(480, 480),        # Balanced speed/accuracy
-    det_thresh=0.5
-)
 
-print("✅ InsightFace model loaded successfully", file=sys.stderr)
+def extract_selfie(image_path):
+  """Extract face embedding from a selfie"""
+  try:
+      app = initialize_model()
+      img = cv2.imread(image_path)
+      if img is None:
+          return {'success': False, 'error': 'Could not read image'}
 
-# ========================================================================
-# Helper Functions
-# ========================================================================
+      faces = app.get(img)
+      if len(faces) == 0:
+          return {'success': False, 'error': 'No face detected in selfie'}
+      if len(faces) > 1:
+          return {
+              'success': False,
+              'error': 'Multiple faces detected. Please use a clear selfie with only one person.'
+          }
 
-def preprocess_image(img, max_dimension=1280):
-    """Smart resizing: only resize if image is too large."""
-    height, width = img.shape[:2]
-    max_side = max(height, width)
+      face = faces[0]
+      embedding = face.embedding.tolist()
 
-    if max_side > max_dimension:
-        scale = max_dimension / max_side
-        new_width = int(width * scale)
-        new_height = int(height * scale)
-        img = cv2.resize(
-            img,
-            (new_width, new_height),
-            interpolation=cv2.INTER_AREA
-        )
+      return {
+          'success': True,
+          'embedding': embedding,
+          'face_detected': True,
+          'confidence': float(face.det_score)
+      }
+  except Exception as e:
+      return {'success': False, 'error': str(e)}
 
-    return img
+
+def extract_photo(image_path):
+  """Extract all faces from an event photo"""
+  try:
+      app = initialize_model()
+      img = cv2.imread(image_path)
+      if img is None:
+          return {'success': False, 'error': 'Could not read image'}
+
+      faces = app.get(img)
+      faces_data = []
+      for idx, face in enumerate(faces):
+          faces_data.append({
+              'faceIndex': idx,
+              'embedding': face.embedding.tolist(),
+              'boundingBox': face.bbox.tolist(),
+              'confidence': float(face.det_score),
+              'age': int(face.age),
+              'gender': 'M' if int(face.gender) == 1 else 'F',
+          })
+
+      return {
+          'success': True,
+          'faces': faces_data,
+          'faces_detected': len(faces_data)
+      }
+  except Exception as e:
+      return {'success': False, 'error': str(e)}
+
+
+def extract_embedding(image_path):
+  """Alias for extract_selfie"""
+  return extract_selfie(image_path)
 
 
 def cosine_similarity(emb1, emb2):
-    """Calculate cosine similarity between two embeddings."""
-    return np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
-
-# ========================================================================
-# Main Functions
-# ========================================================================
-
-def extract_face_embedding(image_path):
-    """
-    Extract face embedding from a single image (selfie).
-    Returns a dict: { success, embedding?, confidence?, faces_detected?, error? }
-    """
-    try:
-        if not os.path.exists(image_path):
-            return {"success": False, "error": "Image file not found"}
-
-        img = cv2.imread(image_path)
-        if img is None:
-            return {"success": False, "error": "Could not read image"}
-
-        img = preprocess_image(img)
-        faces = app.get(img)
-
-        if len(faces) == 0:
-            return {"success": False, "error": "No face detected in image"}
-
-        face = faces[0]
-        embedding = face.embedding.tolist()
-
-        return {
-            "success": True,
-            "embedding": embedding,
-            "confidence": float(face.det_score),
-            "faces_detected": len(faces)
-        }
-
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+  emb1 = np.array(emb1)
+  emb2 = np.array(emb2)
+  return np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
 
 
-def extract_faces_from_photo(image_path):
-    """
-    Extract ALL faces from an event photo.
-    Returns embeddings + confidence for each detected face.
-    """
-    try:
-        if not os.path.exists(image_path):
-            return {"success": False, "error": "Image file not found"}
+def match_faces(user_embedding, event_photos, threshold=0.6):
+  matched_photos = []
+  total_faces_searched = 0
 
-        img = cv2.imread(image_path)
-        if img is None:
-            return {"success": False, "error": "Could not read image"}
+  for photo in event_photos:
+      photo_id = photo['id']
+      faces = photo.get('faces', [])
 
-        img = preprocess_image(img)
-        faces = app.get(img)
+      for face_idx, face in enumerate(faces):
+          total_faces_searched += 1
+          face_embedding = face.get('embedding')
+          if not face_embedding:
+              continue
 
-        face_list = []
-        for idx, face in enumerate(faces):
-            face_list.append({
-                "index": idx,
-                "embedding": face.embedding.tolist(),
-                "confidence": float(face.det_score)
-            })
+          similarity = cosine_similarity(user_embedding, face_embedding)
+          distance = 1 - similarity
 
-        return {
-            "success": True,
-            "faces": face_list,
-            "faces_detected": len(faces)
-        }
+          if distance < threshold:
+              matched_photos.append({
+                  'photo_id': photo_id,
+                  'face_index': face_idx,
+                  'similarity': float(similarity),
+                  'distance': float(distance),
+                  'confidence': float(similarity * 100),
+              })
 
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+  return {
+      'success': True,
+      'matched_photos': matched_photos,
+      'total_matches': len(matched_photos),
+      'total_faces_searched': total_faces_searched,
+  }
 
 
-def find_matching_photos(selfie_embedding, event_photos):
-    """
-    Compare selfie embedding with all event photos.
+def match_from_file(file_path):
+  try:
+      with open(file_path, 'r') as f:
+          data = json.load(f)
 
-    selfie_embedding: list of floats (512D)
-    event_photos: [{ id: str, faces: [{ embedding: [...], confidence: float }] }]
-    """
-    try:
-        user_embedding = np.array(selfie_embedding)
-        threshold = 0.40  # Same as your BALANCED test
+      user_embedding = data['user_embedding']
+      event_photos = data['event_photos']
+      threshold = data.get('threshold', 0.6)  # value from Node / config
 
-        matched_photos = []
+      return match_faces(user_embedding, event_photos, threshold)
+  except Exception as e:
+      return {'success': False, 'error': f'File matching error: {str(e)}'}
 
-        for photo in event_photos:
-            photo_id = photo.get("id")
-            faces = photo.get("faces", [])
 
-            for face_idx, face_data in enumerate(faces):
-                if "embedding" not in face_data:
-                    continue
+def main():
+  if len(sys.argv) < 2:
+      print(json.dumps({'success': False, 'error': 'No command provided'}))
+      sys.exit(1)
 
-                face_embedding = np.array(face_data["embedding"])
-                similarity = cosine_similarity(user_embedding, face_embedding)
-                distance = 1 - similarity
+  command = sys.argv[1]
 
-                if distance < threshold:
-                    match_confidence = (1 - distance) * 100.0
+  try:
+      if command == 'extract_selfie':
+          if len(sys.argv) < 3:
+              result = {'success': False, 'error': 'Image path required'}
+          else:
+              result = extract_selfie(sys.argv[2])
 
-                    matched_photos.append({
-                        "photo_id": photo_id,
-                        "face_index": face_idx + 1,
-                        "similarity": float(match_confidence),
-                        "distance": float(distance)
-                    })
+      elif command == 'extract_photo':
+          if len(sys.argv) < 3:
+              result = {'success': False, 'error': 'Image path required'}
+          else:
+              result = extract_photo(sys.argv[2])
 
-        return {
-            "success": True,
-            "matched_photos": matched_photos,
-            "total_matches": len(matched_photos)
-        }
+      elif command == 'extract_embedding':
+          if len(sys.argv) < 3:
+              result = {'success': False, 'error': 'Image path required'}
+          else:
+              result = extract_embedding(sys.argv[2])
 
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+      elif command == 'match':
+          if len(sys.argv) < 4:
+              result = {'success': False, 'error': 'Embedding and photos required'}
+          else:
+              user_embedding = json.loads(sys.argv[2])
+              event_photos = json.loads(sys.argv[3])
+              result = match_faces(user_embedding, event_photos)
 
-# ========================================================================
-# CLI Handler (single JSON line to stdout ONLY)
-# ========================================================================
+      elif command == 'match_from_file':
+          if len(sys.argv) < 3:
+              result = {'success': False, 'error': 'File path required'}
+          else:
+              result = match_from_file(sys.argv[2])
 
-if __name__ == "__main__":
-    # NOTE: At this point sys.stdout is redirected to stderr for libraries,
-    # but print(json.dumps(...)) below still writes to that object.
-    # For Node, we care only about the *captured* stdout from the child process,
-    # which is what these prints produce.
-    if len(sys.argv) < 3:
-        print(json.dumps({"success": False, "error": "Invalid arguments"}))
-        sys.exit(1)
+      else:
+          result = {'success': False, 'error': f'Unknown command: {command}'}
 
-    command = sys.argv[1]
+      print(json.dumps(result))
+      sys.exit(0)
+  except Exception as e:
+      print(json.dumps({'success': False, 'error': str(e)}))
+      sys.exit(1)
 
-    if command == "extract_selfie":
-        image_path = sys.argv[2]
-        result = extract_face_embedding(image_path)
-        print(json.dumps(result))
 
-    elif command == "extract_photo":
-        image_path = sys.argv[2]
-        result = extract_faces_from_photo(image_path)
-        print(json.dumps(result))
-
-    elif command == "match":
-        selfie_embedding = json.loads(sys.argv[2])
-        event_photos = json.loads(sys.argv[3])
-        result = find_matching_photos(selfie_embedding, event_photos)
-        print(json.dumps(result))
-
-    else:
-        print(json.dumps({"success": False, "error": "Unknown command"}))
+if __name__ == '__main__':
+  main()

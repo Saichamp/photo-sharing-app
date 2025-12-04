@@ -1,0 +1,23 @@
+{
+  "ignore": [
+    "temp/*",
+    "uploads/*",
+    "logs/*",
+    "node_modules/*",
+    ".git"
+  ],
+  "watch": [
+    "controllers",
+    "routes",
+    "models",
+    "services",
+    "middleware",
+    "utils",
+    "config",
+    "server.js"
+  ],
+  "ext": "js,json",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
