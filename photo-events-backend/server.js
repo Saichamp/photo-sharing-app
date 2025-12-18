@@ -2,7 +2,8 @@
  * PhotoManEa Backend Server
  * Production-ready Express server with security, logging, and error handling
  */
-
+const adminRoutes = require('./routes/admin');
+const systemRoutes = require('./routes/system');
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -206,7 +207,8 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/system', systemRoutes);
 
 // ============================================
 // 12. START THE SERVER
