@@ -2,8 +2,7 @@
  * PhotoManEa Backend Server
  * Production-ready Express server with security, logging, and error handling
  */
-const adminRoutes = require('./routes/admin');
-const systemRoutes = require('./routes/system');
+
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -81,7 +80,7 @@ app.get('/api/status', (req, res) => {
 logger.info('📡 Loading API routes...');
 
 try {
-  // Auth routes (AUTHENTICATION SYSTEM - NEW!)
+  // Auth routes
   app.use('/api/auth', require('./routes/auth'));
   logger.info('  ✅ Auth routes loaded');
   
@@ -100,11 +99,19 @@ try {
   // Face matching routes
   app.use('/api/face-matching', require('./routes/faceMatching'));
   logger.info('  ✅ Face matching routes loaded');
+
+  // Admin routes (NEW - Phase 1)
+  const adminRoutes = require('./routes/admin');
+  const systemRoutes = require('./routes/system');
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/admin/system', systemRoutes);
+  logger.info('  ✅ Admin routes loaded');
   
   logger.info('✅ All routes loaded successfully');
 } catch (error) {
   logger.error('❌ Failed to load routes:', error);
   console.error('Route loading error:', error.message);
+  console.error('Stack:', error.stack);
   process.exit(1);
 }
 
@@ -148,13 +155,22 @@ const startServer = async () => {
       console.log('   GET  /api/health              - Health check');
       console.log('   GET  /api/status              - System status');
       console.log('');
-      console.log('   ── AUTHENTICATION (NEW!) ──');
+      console.log('   ── AUTHENTICATION ──');
       console.log('   POST /api/auth/register       - Organizer signup');
       console.log('   POST /api/auth/login          - User login');
-      console.log('   GET  /api/auth/me             - Get profile (protected)');
-      console.log('   PUT  /api/auth/update-profile - Update profile (protected)');
-      console.log('   PUT  /api/auth/change-password- Change password (protected)');
-      console.log('   POST /api/auth/logout         - Logout (protected)');
+      console.log('   GET  /api/auth/me             - Get profile');
+      console.log('   PUT  /api/auth/update-profile - Update profile');
+      console.log('   PUT  /api/auth/change-password- Change password');
+      console.log('   POST /api/auth/logout         - Logout');
+      console.log('');
+      console.log('   ── ADMIN (NEW!) ──');
+      console.log('   GET  /api/admin/users         - List all users');
+      console.log('   GET  /api/admin/users/:id     - Get user details');
+      console.log('   PUT  /api/admin/users/:id     - Update user');
+      console.log('   POST /api/admin/users/:id/reset-password - Reset password');
+      console.log('   PATCH /api/admin/users/:id/toggle-status - Enable/disable');
+      console.log('   GET  /api/admin/stats         - Dashboard stats');
+      console.log('   GET  /api/admin/system/health - System health');
       console.log('');
       console.log('   ── EVENTS ──');
       console.log('   POST /api/events              - Create event');
@@ -168,7 +184,7 @@ const startServer = async () => {
       console.log('   POST /api/face-matching       - Face matching');
       console.log('═══════════════════════════════════════════════════════');
       console.log('');
-      console.log('🎉 Phase 1 Complete: Authentication System Active!');
+      console.log('🎉 Phase 1 Complete: Admin Control Panel Active!');
       console.log('');
       
       logger.info(`Server started on ${HOST}:${PORT}`);
@@ -177,6 +193,7 @@ const startServer = async () => {
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
     console.error('Startup error:', error.message);
+    console.error('Stack:', error.stack);
     process.exit(1);
   }
 };
@@ -207,9 +224,6 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/system', systemRoutes);
-
 // ============================================
 // 12. START THE SERVER
 // ============================================
@@ -217,5 +231,3 @@ startServer();
 
 // Export app for testing
 module.exports = app;
-const photoRoutes = require('./routes/photos');
-app.use('/api/photos', photoRoutes);

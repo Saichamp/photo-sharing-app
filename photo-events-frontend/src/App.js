@@ -22,6 +22,12 @@ import MultiStepForm from './components/MultiStepForm';           // old version
 import GuestRegistration from './pages/Guest/GuestRegistration'; // new version
 import GuestGallery from './pages/Guest/GuestGallery';
 
+// Admin Pages
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import UserManagement from './pages/Admin/UserManagement';
+import SystemMonitor from './pages/Admin/SystemMonitor';
+import PhotoManager from './pages/Admin/PhotoManager';
+
 // Components
 import { Navbar } from './components/common/Navbar';
 
@@ -36,6 +42,25 @@ const ProtectedRoute = ({ children }) => {
   }
 
   return user ? children : <Navigate to="/login" replace />;
+};
+
+// Admin Route Component - restricts access to admin users only
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <Loader size="lg" text="Loading..." />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
 };
 
 // Public Route (redirect to dashboard if logged in)
@@ -101,6 +126,40 @@ function AppRoutes() {
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes - Protected by admin role */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminRoute>
+              <UserManagement />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/system"
+          element={
+            <AdminRoute>
+              <SystemMonitor />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/photos"
+          element={
+            <AdminRoute>
+              <PhotoManager />
+            </AdminRoute>
           }
         />
 
