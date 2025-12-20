@@ -1,12 +1,17 @@
-// backend/routes/system.js
+/**
+ * System routes - /api/admin/system/*
+ */
+
 const express = require('express');
 const router = express.Router();
 
 const systemController = require('../controllers/systemController');
-const authenticate = require('../middleware/authenticate');
+const { authenticate } = require('../middleware/authenticate');
 const adminAuth = require('../middleware/adminAuth');
 
-router.use(authenticate, adminAuth);
+// Apply authentication and admin check to ALL routes
+router.use(authenticate);
+router.use(adminAuth);
 
 router.get('/health', systemController.getHealth);
 router.get('/health/trend', systemController.getHealthTrend);
