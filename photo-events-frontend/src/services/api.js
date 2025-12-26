@@ -152,5 +152,26 @@ export const faceAPI = {
     api.post('/face-matching/find-by-registration', { registrationId }),
 };
 
+// ========================================
+// 🆕 ADMIN API ENDPOINTS (ADD THIS)
+// ========================================
+export const adminAPI = {
+  // Platform Statistics
+  getStats: () => api.get('/admin/stats'),
+
+  // User Management
+  getUsers: (params) => api.get('/admin/users', { params }),
+  getUserById: (id) => api.get(`/admin/users/${id}`),
+  updateUserStatus: (id, isActive) => api.put(`/admin/users/${id}/status`, { isActive }),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+
+  // Event Management (All Events)
+  getAllEvents: (params) => api.get('/admin/events', { params }),
+  deleteEvent: (id) => api.delete(`/admin/events/${id}`),
+
+  // Logs & Monitoring
+  getLogs: (params) => api.get('/admin/logs', { params })
+};
+
 
 export default api;

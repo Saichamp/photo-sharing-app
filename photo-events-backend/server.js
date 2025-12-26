@@ -15,7 +15,7 @@ const { applySecurity } = require('./config/security');
 // Import middleware
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger, logger } = require('./utils/logger');
-
+const adminRoutes = require('./routes/admin');
 // Initialize Express app
 const app = express();
 
@@ -114,7 +114,7 @@ try {
   console.error('Stack:', error.stack);
   process.exit(1);
 }
-
+app.use('/api/admin', adminRoutes)
 // ============================================
 // 8. 404 HANDLER (Route not found)
 // ============================================

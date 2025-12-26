@@ -9,10 +9,10 @@ const authController = require('../controllers/authController');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { validateBody } = require('../utils/validators');
 
-// We'll create this middleware in the next step
-// For now, we'll define a placeholder
+/**
+ * Authentication middleware (placeholder)
+ */
 const authenticate = (req, res, next) => {
-  // Will be replaced with actual middleware in Step 1.4
   next();
 };
 
@@ -20,7 +20,6 @@ const authenticate = (req, res, next) => {
  * @route   POST /api/auth/register
  * @desc    Register new organizer
  * @access  Public
- * @rateLimit 5 requests per 15 minutes
  */
 router.post(
   '/register',
@@ -33,91 +32,63 @@ router.post(
  * @route   POST /api/auth/login
  * @desc    Login user and get token
  * @access  Public
- * @rateLimit 5 requests per 15 minutes
  */
 router.post(
   '/login',
   authLimiter,
-  validateBody('login'),
+  validateBody('login'),  // ✅ This works
   authController.login
 );
 
 /**
  * @route   POST /api/auth/refresh-token
- * @desc    Refresh access token using refresh token
+ * @desc    Refresh access token
  * @access  Public
  */
-router.post(
-  '/refresh-token',
-  authController.refreshToken
-);
+router.post('/refresh-token', authController.refreshToken);
 
 /**
  * @route   GET /api/auth/me
- * @desc    Get current logged in user profile
+ * @desc    Get current user profile
  * @access  Private
  */
-router.get(
-  '/me',
-  authenticate,
-  authController.getMe
-);
+router.get('/me', authenticate, authController.getMe);
 
 /**
  * @route   PUT /api/auth/update-profile
- * @desc    Update user profile (name, email)
+ * @desc    Update user profile
  * @access  Private
+ * NO VALIDATOR YET - will add later
  */
-router.put(
-  '/update-profile',
-  authenticate,
-  authController.updateProfile
-);
+router.put('/update-profile', authenticate, authController.updateProfile);
 
 /**
  * @route   PUT /api/auth/change-password
  * @desc    Change user password
  * @access  Private
+ * NO VALIDATOR YET - will add later
  */
-router.put(
-  '/change-password',
-  authenticate,
-  authController.changePassword
-);
-
+router.put('/change-password', authenticate, authController.changePassword);
 
 /**
  * @route   POST /api/auth/logout
- * @desc    Logout user (client-side token removal)
- * @access  Public (no auth required)
+ * @desc    Logout user
+ * @access  Public
  */
-router.post(
-  '/logout',
-  // Remove authenticate middleware - make it public
-  authController.logout
-);
-
+router.post('/logout', authController.logout);
 
 /**
  * @route   GET /api/auth/verify-token
- * @desc    Verify if JWT token is valid
+ * @desc    Verify JWT token
  * @access  Private
  */
-router.get(
-  '/verify-token',
-  authenticate,
-  authController.verifyToken
-);
+router.get('/verify-token', authenticate, authController.verifyToken);
 
 /**
  * @route   DELETE /api/auth/delete-account
- * @desc    Delete user account (soft delete)
+ * @desc    Delete user account
  * @access  Private
  */
-router.delete(
-  '/delete-account',
-  authenticate,
-  authController.deleteAccount
-);
+router.delete('/delete-account', authenticate, authController.deleteAccount);
 
 module.exports = router;

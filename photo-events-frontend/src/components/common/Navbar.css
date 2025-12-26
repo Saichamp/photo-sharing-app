@@ -302,3 +302,49 @@
     padding: 0 var(--space-4);
   }
 }
+/* Admin-specific styles */
+.admin-link {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white !important;
+  padding: 8px 16px !important;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.admin-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.admin-link.active {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.admin-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.admin-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border: 2px solid #764ba2;
+}
+
+.badge-admin {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+}
+
+.mobile-menu-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 8px 0;
+}
