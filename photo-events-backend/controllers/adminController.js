@@ -1,39 +1,139 @@
 /**
- * adminController - admin user management & stats
+ * Admin Controller for PhotoManEa
+ * Handles admin-only operations
  */
 
-const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Photo = require('../models/Photo');
-const AdminLog = require('../models/AdminLog');
-const {
-  AppError,
-  asyncHandler,
-  successResponse
-} = require('../middleware/errorHandler');
+const Registration = require('../models/Registration');
+const { AppError, asyncHandler, successResponse } = require('../middleware/errorHandler');
 const { logger } = require('../utils/logger');
 
-async function getUserStats(userId) {
-  const [eventCount, photoCount] = await Promise.all([
-    Event.countDocuments({ userId }),
-    Photo.countDocuments({ userId })
+/**
+ * @route   GET /api/admin/stats
+ * @desc    Get platform-wide statistics
+ * @access  Private/Admin
+ */
+exports.getPlatformStats = asyncHandler(async (req, res, next) => {
+  // Get counts
+  const [
+    totalUsers,
+    activeUsers,
+    totalEvents,
+    activeEvents,
+    totalPhotos,
+    totalRegistrations
+  ] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ isActive: true }),
+    Event.countDocuments(),
+    Event.countDocuments({ status: 'active' }),
+    Photo.countDocuments(),
+    Registration.countDocuments()
   ]);
 
-  return { eventCount, photoCount };
-}
+  // Get subscription breakdown
+  const subscriptionStats = await User.aggregate([
+    {
+      $group: {
+        _id: '$subscription.plan',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
 
-exports.getAllUsers = asyncHandler(async (req, res) => {
+  // Get storage usage
+  const storageStats = await User.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalStorageUsed: { $sum: '$quota.storageUsed' },
+        totalStorageLimit: { $sum: '$quota.storageLimit' }
+      }
+    }
+  ]);
+
+  // Get recent growth (last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const [newUsers, newEvents] = await Promise.all([
+    User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+    Event.countDocuments({ createdAt: { $gte: thirtyDaysAgo } })
+  ]);
+
+  // Get top organizers by events
+  const topOrganizers = await Event.aggregate([
+    {
+      $group: {
+        _id: '$userId',
+        eventCount: { $sum: 1 }
+      }
+    },
+    { $sort: { eventCount: -1 } },
+    { $limit: 5 },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'user'
+      }
+    },
+    { $unwind: '$user' },
+    {
+      $project: {
+        name: '$user.name',
+        email: '$user.email',
+        eventCount: 1
+      }
+    }
+  ]);
+
+  logger.info('Platform stats retrieved', { adminId: req.user.id });
+
+  successResponse(res, {
+    overview: {
+      totalUsers,
+      activeUsers,
+      inactiveUsers: totalUsers - activeUsers,
+      totalEvents,
+      activeEvents,
+      totalPhotos,
+      totalRegistrations
+    },
+    subscriptions: subscriptionStats.reduce((acc, curr) => {
+      acc[curr._id] = curr.count;
+      return acc;
+    }, {}),
+    storage: storageStats[0] || { totalStorageUsed: 0, totalStorageLimit: 0 },
+    growth: {
+      newUsersLast30Days: newUsers,
+      newEventsLast30Days: newEvents
+    },
+    topOrganizers
+  }, 'Platform statistics retrieved');
+});
+
+/**
+ * @route   GET /api/admin/users
+ * @desc    Get all users with pagination and filters
+ * @access  Private/Admin
+ */
+exports.getAllUsers = asyncHandler(async (req, res, next) => {
   const {
     page = 1,
     limit = 20,
     search = '',
-    role,
-    status,
-    plan,
-    sortBy = '-createdAt'
+    role = '',
+    status = '',
+    plan = '',
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
   } = req.query;
 
+  // Build filter
   const filter = {};
 
   if (search) {
@@ -48,324 +148,330 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
   if (status === 'inactive') filter.isActive = false;
   if (plan) filter['subscription.plan'] = plan;
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // Calculate pagination
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
+  // Get users and total count
   const [users, total] = await Promise.all([
     User.find(filter)
       .select('-password')
-      .sort(sortBy)
+      .sort(sort)
       .skip(skip)
-      .limit(Number(limit))
+      .limit(parseInt(limit))
       .lean(),
     User.countDocuments(filter)
   ]);
 
-  const usersWithStats = await Promise.all(
-    users.map(async (u) => {
-      const { eventCount, photoCount } = await getUserStats(u._id);
-      return {
-        ...u,
-        eventCount,
-        photoCount
-      };
-    })
-  );
-
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: 'USER_VIEWED',
-    details: { count: users.length, filters: filter },
-    ipAddress: req.ip,
-    userAgent: req.get('user-agent')
-  });
-
-  successResponse(
-    res,
-    {
-      users: usersWithStats,
-      pagination: {
-        total,
-        page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
-        limit: Number(limit)
-      }
-    },
-    'Users retrieved successfully'
-  );
-});
-
-exports.getUserById = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const user = await User.findById(id).select('-password').lean();
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  const [events, photos] = await Promise.all([
-    Event.find({ userId: id })
-      .select('name date status photosUploaded')
-      .sort('-createdAt')
-      .limit(10)
-      .lean(),
-    Photo.find({ userId: id })
-      .select('filename uploadedAt processed')
-      .sort('-uploadedAt')
-      .limit(10)
-      .lean()
+  // Get event counts for each user
+  const userIds = users.map(u => u._id);
+  const eventCounts = await Event.aggregate([
+    { $match: { userId: { $in: userIds } } },
+    { $group: { _id: '$userId', count: { $sum: 1 } } }
   ]);
 
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: 'USER_VIEWED',
-    targetUserId: id,
-    details: {},
-    ipAddress: req.ip,
-    userAgent: req.get('user-agent')
-  });
+  const eventCountMap = eventCounts.reduce((acc, curr) => {
+    acc[curr._id.toString()] = curr.count;
+    return acc;
+  }, {});
 
-  successResponse(
-    res,
-    { user, events, photos },
-    'User details retrieved successfully'
-  );
+  // Attach event counts to users
+  const usersWithStats = users.map(user => ({
+    ...user,
+    eventCount: eventCountMap[user._id.toString()] || 0
+  }));
+
+  logger.info('Users list retrieved', { adminId: req.user.id, count: users.length });
+
+  successResponse(res, {
+    users: usersWithStats,
+    pagination: {
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      totalUsers: total,
+      limit: parseInt(limit)
+    }
+  }, 'Users retrieved successfully');
 });
 
-exports.updateUser = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { name, email, role, isActive, subscription, quota } = req.body;
-
-  const user = await User.findById(id);
+/**
+ * @route   GET /api/admin/users/:id
+ * @desc    Get detailed user information
+ * @access  Private/Admin
+ */
+exports.getUserById = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id).select('-password').lean();
 
   if (!user) {
     throw new AppError('User not found', 404);
   }
 
-  const updates = {};
-  if (name) updates.name = name;
-  if (email) updates.email = email;
-  if (role) updates.role = role;
-  if (typeof isActive === 'boolean') updates.isActive = isActive;
-  if (subscription) {
-    updates.subscription = { ...user.subscription, ...subscription };
-  }
-  if (quota) {
-    updates.quota = { ...user.quota, ...quota };
-  }
+  // Get user's events
+  const events = await Event.find({ userId: user._id })
+    .select('name status createdAt')
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
 
-  Object.assign(user, updates);
-  await user.save();
+  // Get user's activity stats
+  const [eventCount, photoCount, registrationCount] = await Promise.all([
+    Event.countDocuments({ userId: user._id }),
+    Photo.countDocuments({ uploadedBy: user._id }),
+    Registration.countDocuments({ userId: user._id })
+  ]);
 
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: 'USER_UPDATED',
-    targetUserId: id,
-    details: updates,
-    ipAddress: req.ip,
-    userAgent: req.get('user-agent')
-  });
+  logger.info('User details retrieved', { adminId: req.user.id, targetUserId: user._id });
 
-  logger.info('Admin updated user', {
-    adminId: req.user._id,
-    userId: id,
-    updates: Object.keys(updates)
-  });
-
-  const safeUser = user.toObject();
-  delete safeUser.password;
-
-  successResponse(res, safeUser, 'User updated successfully');
+  successResponse(res, {
+    user,
+    stats: {
+      totalEvents: eventCount,
+      totalPhotos: photoCount,
+      totalRegistrations: registrationCount
+    },
+    recentEvents: events
+  }, 'User details retrieved');
 });
 
-exports.resetUserPassword = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { newPassword } = req.body;
+/**
+ * @route   PUT /api/admin/users/:id/status
+ * @desc    Update user status (ban/activate)
+ * @access  Private/Admin
+ */
+exports.updateUserStatus = asyncHandler(async (req, res, next) => {
+  const { isActive } = req.body;
 
-  if (!newPassword || newPassword.length < 6) {
-    throw new AppError('Password must be at least 6 characters', 400);
+  if (typeof isActive !== 'boolean') {
+    throw new AppError('isActive must be a boolean', 400);
   }
 
-  const user = await User.findById(id);
+  const user = await User.findById(req.params.id);
 
   if (!user) {
     throw new AppError('User not found', 404);
   }
 
-  const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(newPassword, salt);
-  await user.save();
-
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: 'PASSWORD_RESET',
-    targetUserId: id,
-    details: { email: user.email },
-    ipAddress: req.ip,
-    userAgent: req.get('user-agent')
-  });
-
-  logger.warn('Admin reset user password', {
-    adminId: req.user._id,
-    userId: id,
-    email: user.email
-  });
-
-  successResponse(res, null, 'Password reset successfully');
-});
-
-exports.toggleUserStatus = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const user = await User.findById(id);
-
-  if (!user) {
-    throw new AppError('User not found', 404);
+  // Prevent admin from deactivating themselves
+  if (user._id.toString() === req.user.id && !isActive) {
+    throw new AppError('You cannot deactivate your own account', 400);
   }
 
-  user.isActive = !user.isActive;
+  user.isActive = isActive;
   await user.save();
 
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: user.isActive ? 'USER_ENABLED' : 'USER_DISABLED',
-    targetUserId: id,
-    details: { email: user.email, isActive: user.isActive },
-    ipAddress: req.ip
+  logger.warn('User status updated', {
+    adminId: req.user.id,
+    targetUserId: user._id,
+    newStatus: isActive ? 'active' : 'inactive'
   });
 
-  logger.info('Admin toggled user status', {
-    adminId: req.user._id,
-    userId: id,
+  successResponse(res, {
+    id: user._id,
+    email: user.email,
     isActive: user.isActive
-  });
-
-  successResponse(
-    res,
-    { isActive: user.isActive },
-    `User ${user.isActive ? 'enabled' : 'disabled'} successfully`
-  );
+  }, `User ${isActive ? 'activated' : 'deactivated'} successfully`);
 });
 
-exports.updateSubscription = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { plan, status, expiresAt } = req.body;
-
-  const user = await User.findById(id);
+/**
+ * @route   DELETE /api/admin/users/:id
+ * @desc    Delete user account (hard delete)
+ * @access  Private/Admin
+ */
+exports.deleteUser = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id);
 
   if (!user) {
     throw new AppError('User not found', 404);
   }
 
-  if (plan) user.subscription.plan = plan;
-  if (status) user.subscription.status = status;
-  if (expiresAt) user.subscription.expiresAt = new Date(expiresAt);
-
-  const quotaMap = {
-    free: { eventsLimit: 3, storageLimit: 1 * 1024 * 1024 * 1024 },
-    pro: { eventsLimit: 20, storageLimit: 10 * 1024 * 1024 * 1024 },
-    enterprise: { eventsLimit: -1, storageLimit: 100 * 1024 * 1024 * 1024 }
-  };
-
-  if (plan && quotaMap[plan]) {
-    user.quota = { ...user.quota, ...quotaMap[plan] };
+  // Prevent admin from deleting themselves
+  if (user._id.toString() === req.user.id) {
+    throw new AppError('You cannot delete your own account', 400);
   }
 
-  await user.save();
+  // Delete user's events, photos, and registrations
+  await Promise.all([
+    Event.deleteMany({ userId: user._id }),
+    Photo.deleteMany({ uploadedBy: user._id }),
+    Registration.deleteMany({ userId: user._id })
+  ]);
 
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: 'SUBSCRIPTION_UPDATED',
-    targetUserId: id,
-    details: { plan, status, expiresAt },
-    ipAddress: req.ip
+  await user.deleteOne();
+
+  logger.warn('User deleted by admin', {
+    adminId: req.user.id,
+    deletedUserId: user._id,
+    deletedUserEmail: user.email
   });
 
-  logger.info('Admin updated subscription', {
-    adminId: req.user._id,
-    userId: id,
-    plan
-  });
-
-  successResponse(res, user.subscription, 'Subscription updated successfully');
+  successResponse(res, null, 'User and all associated data deleted successfully');
 });
 
-exports.deleteUser = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+/**
+ * @route   GET /api/admin/events
+ * @desc    Get all events from all users
+ * @access  Private/Admin
+ */
+exports.getAllEvents = asyncHandler(async (req, res, next) => {
+  const {
+    page = 1,
+    limit = 20,
+    search = '',
+    status = '',
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = req.query;
 
-  const user = await User.findById(id);
+  // Build filter
+  const filter = {};
 
-  if (!user) {
-    throw new AppError('User not found', 404);
+  if (search) {
+    filter.name = { $regex: search, $options: 'i' };
   }
 
-  user.isActive = false;
-  user.deletedAt = new Date();
-  await user.save();
+  if (status) filter.status = status;
 
-  await AdminLog.createLog({
-    adminId: req.user._id,
-    action: 'USER_DELETED',
-    targetUserId: id,
-    details: { email: user.email },
-    ipAddress: req.ip
-  });
+  // Calculate pagination
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
-  logger.warn('Admin deleted user', {
-    adminId: req.user._id,
-    userId: id,
-    email: user.email
-  });
+  // Get events with organizer info
+  const [events, total] = await Promise.all([
+    Event.find(filter)
+      .populate('userId', 'name email')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean(),
+    Event.countDocuments(filter)
+  ]);
 
-  successResponse(res, null, 'User deleted successfully');
-});
-
-exports.getDashboardStats = asyncHandler(async (req, res) => {
-  const [
-    totalUsers,
-    activeUsers,
-    totalEvents,
-    totalPhotos,
-    processingPhotos,
-    failedPhotos,
-    subscriptionStats
-  ] = await Promise.all([
-    User.countDocuments(),
-    User.countDocuments({ isActive: true }),
-    Event.countDocuments(),
-    Photo.countDocuments(),
-    Photo.countDocuments({ processed: false }),
-    Photo.countDocuments({ processingError: { $ne: null } }),
-    User.aggregate([
-      {
-        $group: {
-          _id: '$subscription.plan',
-          count: { $sum: 1 }
-        }
-      }
+  // Get photo and registration counts for each event
+  const eventIds = events.map(e => e._id);
+  const [photoCounts, registrationCounts] = await Promise.all([
+    Photo.aggregate([
+      { $match: { eventId: { $in: eventIds } } },
+      { $group: { _id: '$eventId', count: { $sum: 1 } } }
+    ]),
+    Registration.aggregate([
+      { $match: { eventId: { $in: eventIds } } },
+      { $group: { _id: '$eventId', count: { $sum: 1 } } }
     ])
   ]);
 
-  successResponse(
-    res,
-    {
-      users: {
-        total: totalUsers,
-        active: activeUsers,
-        inactive: totalUsers - activeUsers
-      },
-      events: {
-        total: totalEvents
-      },
-      photos: {
-        total: totalPhotos,
-        processing: processingPhotos,
-        failed: failedPhotos
-      },
-      subscriptions: subscriptionStats
-    },
-    'Dashboard stats retrieved successfully'
-  );
+  const photoCountMap = photoCounts.reduce((acc, curr) => {
+    acc[curr._id.toString()] = curr.count;
+    return acc;
+  }, {});
+
+  const registrationCountMap = registrationCounts.reduce((acc, curr) => {
+    acc[curr._id.toString()] = curr.count;
+    return acc;
+  }, {});
+
+  // Attach counts to events
+  const eventsWithStats = events.map(event => ({
+    ...event,
+    photoCount: photoCountMap[event._id.toString()] || 0,
+    registrationCount: registrationCountMap[event._id.toString()] || 0,
+    organizer: event.userId
+  }));
+
+  logger.info('All events retrieved', { adminId: req.user.id, count: events.length });
+
+  successResponse(res, {
+    events: eventsWithStats,
+    pagination: {
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      totalEvents: total,
+      limit: parseInt(limit)
+    }
+  }, 'Events retrieved successfully');
 });
 
-module.exports = exports;
+/**
+ * @route   DELETE /api/admin/events/:id
+ * @desc    Delete any event (admin override)
+ * @access  Private/Admin
+ */
+exports.deleteEvent = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+
+  // Delete associated photos and registrations
+  await Promise.all([
+    Photo.deleteMany({ eventId: event._id }),
+    Registration.deleteMany({ eventId: event._id })
+  ]);
+
+  await event.deleteOne();
+
+  logger.warn('Event deleted by admin', {
+    adminId: req.user.id,
+    eventId: event._id,
+    eventName: event.name,
+    organizerId: event.userId
+  });
+
+  successResponse(res, null, 'Event and all associated data deleted successfully');
+});
+
+/**
+ * @route   GET /api/admin/logs
+ * @desc    Get security/activity logs
+ * @access  Private/Admin
+ */
+exports.getLogs = asyncHandler(async (req, res, next) => {
+  const {
+    page = 1,
+    limit = 50,
+    level = '',
+    startDate = '',
+    endDate = ''
+  } = req.query;
+
+  // This is a placeholder - you'd typically read from log files or a logging service
+  // For now, return recent user activities from database
+
+  const filter = {};
+
+  if (startDate) {
+    filter.createdAt = { $gte: new Date(startDate) };
+  }
+
+  if (endDate) {
+    filter.createdAt = { ...filter.createdAt, $lte: new Date(endDate) };
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  // Get recent logins and activities
+  const recentUsers = await User.find(filter)
+    .select('email lastLogin createdAt isActive')
+    .sort({ lastLogin: -1 })
+    .skip(skip)
+    .limit(parseInt(limit))
+    .lean();
+
+  const logs = recentUsers.map(user => ({
+    timestamp: user.lastLogin || user.createdAt,
+    level: user.isActive ? 'info' : 'warn',
+    action: user.lastLogin ? 'login' : 'registration',
+    user: user.email,
+    message: user.lastLogin ? 'User logged in' : 'New user registered'
+  }));
+
+  logger.info('Logs retrieved', { adminId: req.user.id });
+
+  successResponse(res, {
+    logs,
+    pagination: {
+      currentPage: parseInt(page),
+      limit: parseInt(limit)
+    }
+  }, 'Logs retrieved successfully');
+});

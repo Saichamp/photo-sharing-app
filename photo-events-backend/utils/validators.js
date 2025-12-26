@@ -241,37 +241,51 @@ const validateRegistrationData = (data) => {
 /**
  * User Authentication Validation Schema
  */
-const validateAuthData = (data, isRegistration = false) => {
-  const errors = [];
-  
-  // Email validation
-  if (!data.email) {
-    errors.push('Email is required');
-  } else if (!isValidEmail(data.email)) {
-    errors.push('Invalid email format');
-  }
-  
-  // Password validation
-  if (!data.password) {
-    errors.push('Password is required');
-  } else if (isRegistration && !isStrongPassword(data.password)) {
-    errors.push('Password must be at least 8 characters with uppercase, lowercase, and number');
-  }
-  
-  // Name validation (registration only)
-  if (isRegistration) {
-    if (!data.name) {
-      errors.push('Name is required');
-    } else if (!isValidName(data.name)) {
-      errors.push('Invalid name format');
+/**
+ * Validate authentication data (login/register)
+ */
+const validateAuthData = (req, res, next) => {
+  // SAFE: Always check if req.body exists first
+  const body = req.body || {};
+  const { email, password, name } = body;
+
+  const errors = {};
+
+  // Name validation (for register only)
+  if (name !== undefined) {
+    if (!name || name.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters';
     }
   }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
+
+  // Email validation
+  if (!email || !email.trim()) {
+    errors.email = 'Email is required';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = 'Please enter a valid email address';
+  }
+
+  // Password validation
+  if (!password || !password.trim()) {
+    errors.password = 'Password is required';
+  } else if (password.length < 6) {
+    errors.password = 'Password must be at least 6 characters';
+  }
+
+  // If any errors, return 400
+  if (Object.keys(errors).length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors
+    });
+  }
+
+  // Attach validated data to request for convenience
+  req.validatedData = { email: email.trim(), password: password.trim() };
+  next();
 };
+
 
 /**
  * Photo Upload Validation
@@ -351,39 +365,24 @@ const validatePagination = (page, limit) => {
 /**
  * Express Middleware: Validate Request Body
  */
-const validateBody = (schema) => {
-  return (req, res, next) => {
-    let validation;
-    
-    switch (schema) {
-      case 'event':
-        validation = validateEventData(req.body);
-        break;
-      case 'registration':
-        validation = validateRegistrationData(req.body);
-        break;
-      case 'login':
-        validation = validateAuthData(req.body, false);
-        break;
-      case 'signup':
-        validation = validateAuthData(req.body, true);
-        break;
-      default:
-        return next();
-    }
-    
-    if (!validation.isValid) {
-      throw new AppError(validation.errors.join('. '), 400);
-    }
-    
-    // Sanitize inputs
-    if (req.body.name) req.body.name = sanitizeString(req.body.name);
-    if (req.body.email) req.body.email = sanitizeEmail(req.body.email);
-    if (req.body.description) req.body.description = sanitizeString(req.body.description);
-    
-    next();
-  };
+// In utils/validators.js
+const validateBody = (type) => {
+  switch(type) {
+    case 'login':
+      return validateAuthData;
+    case 'signup':
+      return validateAuthData; // Same as login but also validates name
+    case 'updateProfile':
+      return validateUpdateProfile;
+    case 'changePassword':
+      return validateChangePassword;
+    default:
+      return (req, res, next) => next();
+  }
 };
+
+module.exports = { validateBody, validateAuthData /* other exports */ };
+
 
 /**
  * Express Middleware: Validate ObjectId Parameter

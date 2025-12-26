@@ -24,15 +24,18 @@ import GuestGallery from './pages/Guest/GuestGallery';
 
 // Admin Pages
 import AdminDashboard from './pages/Admin/AdminDashboard';
-import UserManagement from './pages/Admin/UserManagement';
-import SystemMonitor from './pages/Admin/SystemMonitor';
-import PhotoManager from './pages/Admin/PhotoManager';
 
 // Components
 import { Navbar } from './components/common/Navbar';
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 
 import './App.css';
+import UserManagement from './pages/Admin/UserManagement';
+import AllEvents from './pages/Admin/AllEvents';
 
+import SecurityLogs from './pages/Admin/SecurityLogs';
+
+import SystemMonitor from './pages/Admin/SystemMonitor';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -42,25 +45,6 @@ const ProtectedRoute = ({ children }) => {
   }
 
   return user ? children : <Navigate to="/login" replace />;
-};
-
-// Admin Route Component - restricts access to admin users only
-const AdminRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <Loader size="lg" text="Loading..." />;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (user.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return children;
 };
 
 // Public Route (redirect to dashboard if logged in)
@@ -81,7 +65,9 @@ function AppRoutes() {
     <>
       {user && <Navbar />}
       <Routes>
-        {/* Public Routes */}
+        {/* ================================
+            PUBLIC ROUTES
+            ================================ */}
         <Route path="/" element={<LandingPage />} />
         <Route
           path="/login"
@@ -100,7 +86,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Guest Registration Routes */}
+        {/* ================================
+            GUEST REGISTRATION ROUTES
+            ================================ */}
         {/* NEW: redesigned version */}
         <Route
           path="/event/register/:eventId"
@@ -119,7 +107,9 @@ function AppRoutes() {
           element={<GuestGallery />}
         />
 
-        {/* Protected Routes */}
+        {/* ================================
+            PROTECTED ROUTES (ORGANIZER)
+            ================================ */}
         <Route
           path="/dashboard/*"
           element={
@@ -129,40 +119,55 @@ function AppRoutes() {
           }
         />
 
-        {/* Admin Routes - Protected by admin role */}
+        {/* ================================
+            ADMIN ROUTES (ADMIN ONLY)
+            ================================ */}
         <Route
-          path="/admin"
+          path="/admin/dashboard"
           element={
-            <AdminRoute>
+            <ProtectedAdminRoute>
               <AdminDashboard />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <AdminRoute>
-              <UserManagement />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/system"
-          element={
-            <AdminRoute>
-              <SystemMonitor />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/photos"
-          element={
-            <AdminRoute>
-              <PhotoManager />
-            </AdminRoute>
+            </ProtectedAdminRoute>
           }
         />
 
+    
+<Route
+  path="/admin/users"
+  element={
+    <ProtectedAdminRoute>
+      <UserManagement />
+    </ProtectedAdminRoute>
+  }
+/>
+
+
+       <Route
+  path="/admin/events"
+  element={
+    <ProtectedAdminRoute>
+      <AllEvents />
+    </ProtectedAdminRoute>
+  }
+/>
+
+<Route
+  path="/admin/logs"
+  element={
+    <ProtectedAdminRoute>
+      <SecurityLogs />
+    </ProtectedAdminRoute>
+  }
+/>
+
+<Route
+  path="/admin/system"
+  element={
+    <ProtectedAdminRoute>
+      <SystemMonitor />
+    </ProtectedAdminRoute>
+  }
+/>
         {/* Catch all - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
