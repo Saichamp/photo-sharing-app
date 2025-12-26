@@ -1,259 +1,200 @@
 /**
- * Authentication Middleware for PhotoManEa
+ * Authentication Middleware
  * Verifies JWT tokens and protects routes
  */
 
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const config = require('../config/config');
-const { AppError, asyncHandler } = require('./errorHandler');
-const { logSecurity, logger } = require('../utils/logger');
+const { logger } = require('../utils/logger');
 
 /**
- * Main Authentication Middleware
- * Verifies JWT token and attaches user to request
+ * Authenticate user via JWT token
  */
-const authenticate = asyncHandler(async (req, res, next) => {
-  let token;
-  
-  // 1. Extract token from Authorization header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  
-  // 2. Check if token exists
-  if (!token) {
-    logSecurity('auth-failed', 'high', {
-      reason: 'no-token',
-      path: req.path,
-      ip: req.ip
-    });
-    throw new AppError('Authentication required. Please login.', 401);
-  }
-  
+exports.authenticate = async (req, res, next) => {
   try {
-    // 3. Verify token
-    const decoded = jwt.verify(token, config.jwt.secret);
+    // Get token from header
+    const authHeader = req.headers.authorization;
     
-    // 4. Find user
-    const user = await User.findById(decoded.id);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. No token provided.'
+      });
+    }
+
+    // Extract token
+    const token = authHeader.split(' ')[1];
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get user from database
+    const user = await User.findById(decoded.id).select('-password');
     
     if (!user) {
-      logSecurity('auth-failed', 'high', {
-        reason: 'user-not-found',
-        userId: decoded.id,
-        ip: req.ip
+      return res.status(401).json({
+        success: false,
+        message: 'User not found. Token invalid.'
       });
-      throw new AppError('User no longer exists. Please login again.', 401);
     }
-    
-    // 5. Check if user is active
+
+    // Check if user is active
     if (!user.isActive) {
-      logSecurity('auth-failed', 'high', {
-        reason: 'account-inactive',
-        userId: user._id,
-        email: user.email,
-        ip: req.ip
+      return res.status(403).json({
+        success: false,
+        message: 'Account has been deactivated. Please contact support.'
       });
-      throw new AppError('Your account has been deactivated.', 403);
     }
-    
-    // 6. Check if user changed password after token was issued
-    if (user.changedPasswordAfter(decoded.iat)) {
-      logSecurity('auth-failed', 'medium', {
-        reason: 'password-changed',
-        userId: user._id,
-        ip: req.ip
-      });
-      throw new AppError('Password recently changed. Please login again.', 401);
-    }
-    
-    // 7. Attach user to request object
+
+    // Attach user to request object
     req.user = user;
-    
-    // 8. Log successful authentication (debug level)
-    logger.debug('User authenticated', {
-      userId: user._id,
-      email: user.email,
-      path: req.path
-    });
-    
     next();
-    
   } catch (error) {
-    // Handle JWT-specific errors
+    logger.error('Authentication error', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
     if (error.name === 'JsonWebTokenError') {
-      logSecurity('auth-failed', 'high', {
-        reason: 'invalid-token',
-        error: error.message,
-        ip: req.ip
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
       });
-      throw new AppError('Invalid token. Please login again.', 401);
     }
-    
+
     if (error.name === 'TokenExpiredError') {
-      logSecurity('auth-failed', 'medium', {
-        reason: 'token-expired',
-        ip: req.ip
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired. Please login again.'
       });
-      throw new AppError('Token expired. Please login again.', 401);
     }
-    
-    // Re-throw AppError or other errors
-    throw error;
+
+    res.status(500).json({
+      success: false,
+      message: 'Authentication failed',
+      error: error.message
+    });
   }
-});
+};
 
 /**
- * Role-based Access Control Middleware
- * Restricts access to specific user roles
- * 
- * Usage: router.get('/admin', authenticate, restrictTo('admin'), handler)
+ * Require admin role middleware
+ * Must be used AFTER authenticate middleware
  */
-const restrictTo = (...roles) => {
-  return (req, res, next) => {
-    // Check if user is authenticated first
-    if (!req.user) {
-      throw new AppError('Authentication required', 401);
-    }
-    
-    // Check if user's role is in allowed roles
-    if (!roles.includes(req.user.role)) {
-      logSecurity('access-denied', 'medium', {
-        userId: req.user._id,
-        userRole: req.user.role,
-        requiredRoles: roles,
-        path: req.path,
-        ip: req.ip
-      });
+exports.requireAdmin = (req, res, next) => {
+  // Check if user exists (should be set by authenticate middleware)
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required'
+    });
+  }
+
+  // Check if user is admin
+  if (req.user.role !== 'admin') {
+    logger.warn('Unauthorized admin access attempt', {
+      service: 'photomanea-backend',
+      userId: req.user._id,
+      userRole: req.user.role,
+      path: req.path
+    });
+
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin privileges required.'
+    });
+  }
+
+  // User is admin, proceed
+  next();
+};
+
+/**
+ * Check quota middleware (for events, photos, etc.)
+ */
+exports.checkQuota = (resourceType) => {
+  return async (req, res, next) => {
+    try {
+      const user = req.user;
+      const plan = user.subscription?.plan || 'free';
+
+      // Define limits for each plan
+      const limits = {
+        free: { events: 3, photos: 100 },
+        basic: { events: 10, photos: 1000 },
+        premium: { events: 50, photos: 5000 },
+        enterprise: { events: Infinity, photos: Infinity }
+      };
+
+      const userLimit = limits[plan]?.[resourceType];
       
-      throw new AppError('You do not have permission to perform this action', 403);
+      if (!userLimit) {
+        return next();
+      }
+
+      // Check current usage
+      if (resourceType === 'events') {
+        const Event = require('../models/Event');
+        const eventCount = await Event.countDocuments({ organizer: user._id });
+        
+        if (eventCount >= userLimit) {
+          return res.status(403).json({
+            success: false,
+            message: `Event limit reached for ${plan} plan. Upgrade to create more events.`,
+            currentUsage: eventCount,
+            limit: userLimit
+          });
+        }
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Quota check error', {
+        service: 'photomanea-backend',
+        error: error.message
+      });
+      next(error);
     }
-    
-    next();
   };
 };
 
 /**
- * Optional Authentication Middleware
- * Attaches user if token is valid, but doesn't fail if not present
- * Useful for routes that work both with/without auth
+ * Verify ownership middleware
  */
-const optionalAuth = asyncHandler(async (req, res, next) => {
-  let token;
-  
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  
-  // If no token, continue without user
-  if (!token) {
-    return next();
-  }
-  
-  try {
-    const decoded = jwt.verify(token, config.jwt.secret);
-    const user = await User.findById(decoded.id);
-    
-    if (user && user.isActive) {
-      req.user = user;
-    }
-  } catch (error) {
-    // Silently fail for optional auth
-    logger.debug('Optional auth failed', { error: error.message });
-  }
-  
-  next();
-});
+exports.verifyOwnership = (Model, paramName = 'id') => {
+  return async (req, res, next) => {
+    try {
+      const resourceId = req.params[paramName];
+      const userId = req.user._id;
 
-/**
- * Verify User Owns Resource Middleware
- * Ensures user can only access their own resources
- * 
- * Usage: router.get('/events/:id', authenticate, verifyOwnership(Event, 'userId'), handler)
- */
-const verifyOwnership = (Model, userField = 'userId') => {
-  return asyncHandler(async (req, res, next) => {
-    const resourceId = req.params.id;
-    
-    if (!resourceId) {
-      throw new AppError('Resource ID is required', 400);
-    }
-    
-    const resource = await Model.findById(resourceId);
-    
-    if (!resource) {
-      throw new AppError('Resource not found', 404);
-    }
-    
-    // Check if user owns the resource
-    const resourceUserId = resource[userField]?.toString();
-    const requestUserId = req.user._id.toString();
-    
-    if (resourceUserId !== requestUserId && req.user.role !== 'admin') {
-      logSecurity('unauthorized-access', 'high', {
-        userId: req.user._id,
-        resourceId,
-        resourceType: Model.modelName,
-        ip: req.ip
-      });
-      
-      throw new AppError('You do not have permission to access this resource', 403);
-    }
-    
-    // Attach resource to request for later use
-    req.resource = resource;
-    
-    next();
-  });
-};
+      const resource = await Model.findById(resourceId);
 
-/**
- * Check User Quota Middleware
- * Ensures user hasn't exceeded their plan limits
- */
-const checkQuota = (quotaType = 'events') => {
-  return asyncHandler(async (req, res, next) => {
-    if (!req.user) {
-      throw new AppError('Authentication required', 401);
-    }
-    
-    if (quotaType === 'events') {
-      if (!req.user.canCreateEvent()) {
-        logSecurity('quota-exceeded', 'medium', {
-          userId: req.user._id,
-          quotaType: 'events',
-          used: req.user.quota.eventsUsed,
-          limit: req.user.quota.eventsLimit
+      if (!resource) {
+        return res.status(404).json({
+          success: false,
+          message: `${Model.modelName} not found`
         });
-        
-        throw new AppError(
-          `Event limit reached (${req.user.quota.eventsUsed}/${req.user.quota.eventsLimit}). Please upgrade your plan.`,
-          403
-        );
       }
-    }
-    
-    if (quotaType === 'storage') {
-      // Check will be done when file size is known
-      req.checkStorage = (requiredBytes) => {
-        if (!req.user.hasStorageSpace(requiredBytes)) {
-          throw new AppError(
-            'Storage limit reached. Please upgrade your plan.',
-            403
-          );
-        }
-      };
-    }
-    
-    next();
-  });
-};
 
-module.exports = {
-  authenticate,
-  restrictTo,
-  optionalAuth,
-  verifyOwnership,
-  checkQuota
+      // Check ownership
+      const ownerId = resource.organizer || resource.userId || resource.user;
+      
+      if (ownerId.toString() !== userId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You do not own this resource.'
+        });
+      }
+
+      // Attach resource to request for later use
+      req.resource = resource;
+      next();
+    } catch (error) {
+      logger.error('Ownership verification error', {
+        service: 'photomanea-backend',
+        error: error.message
+      });
+      next(error);
+    }
+  };
 };

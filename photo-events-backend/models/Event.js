@@ -6,7 +6,6 @@ const eventSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Event must belong to a user'],
-    index: true // For fast queries by user
   },
   
   name: {

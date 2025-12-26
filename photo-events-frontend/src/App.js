@@ -32,6 +32,7 @@ import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import './App.css';
 import UserManagement from './pages/Admin/UserManagement';
 import AllEvents from './pages/Admin/AllEvents';
+import API from './services/api'; // or the correct path to your API client
 
 import SecurityLogs from './pages/Admin/SecurityLogs';
 
@@ -184,5 +185,26 @@ function App() {
     </Router>
   );
 }
+// Admin API endpoints
+export const adminAPI = {
+  // Get dashboard stats
+  getStats: () => API.get('/admin/stats'),
+
+  // User management
+  getUsers: (params) => API.get('/admin/users', { params }),
+  deleteUser: (userId) => API.delete(`/admin/users/${userId}`),
+  updateUserStatus: (userId, isActive) => 
+    API.patch(`/admin/users/${userId}/status`, { isActive }),
+
+  // Event management
+  getAllEvents: (params) => API.get('/admin/events', { params }),
+  deleteEvent: (eventId) => API.delete(`/admin/events/${eventId}`),
+
+  // Security logs
+  getLogs: (params) => API.get('/admin/logs', { params }),
+
+  // System health
+  getSystemHealth: () => API.get('/admin/system-health')
+};
 
 export default App;
