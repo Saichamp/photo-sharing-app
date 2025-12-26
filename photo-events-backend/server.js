@@ -15,7 +15,7 @@ const { applySecurity } = require('./config/security');
 // Import middleware
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger, logger } = require('./utils/logger');
-const adminRoutes = require('./routes/admin');
+
 // Initialize Express app
 const app = express();
 
@@ -73,7 +73,6 @@ app.get('/api/status', (req, res) => {
     }
   });
 });
-
 // ============================================
 // 7. API ROUTES
 // ============================================
@@ -100,11 +99,8 @@ try {
   app.use('/api/face-matching', require('./routes/faceMatching'));
   logger.info('  ✅ Face matching routes loaded');
 
-  // Admin routes (NEW - Phase 1)
-  const adminRoutes = require('./routes/admin');
-  const systemRoutes = require('./routes/system');
-  app.use('/api/admin', adminRoutes);
-  app.use('/api/admin/system', systemRoutes);
+  // Admin routes
+  app.use('/api/admin', require('./routes/admin'));
   logger.info('  ✅ Admin routes loaded');
   
   logger.info('✅ All routes loaded successfully');
@@ -114,11 +110,12 @@ try {
   console.error('Stack:', error.stack);
   process.exit(1);
 }
-app.use('/api/admin', adminRoutes)
+
 // ============================================
 // 8. 404 HANDLER (Route not found)
 // ============================================
 app.use(notFoundHandler);
+
 
 // ============================================
 // 9. GLOBAL ERROR HANDLER (Must be last)

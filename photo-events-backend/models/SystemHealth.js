@@ -10,7 +10,6 @@ const systemHealthSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
-    index: true
   },
   cpu: { type: Number, min: 0, max: 100 },        // CPU %
   memory: { 

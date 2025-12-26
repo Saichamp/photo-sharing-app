@@ -1,71 +1,33 @@
 /**
- * Admin Routes for PhotoManEa
- * All routes require admin authentication
+ * Admin Routes
+ * Routes for admin operations
  */
 
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { authenticate, restrictTo } = require('../middleware/authenticate');
+const { authenticate, requireAdmin } = require('../middleware/authenticate');
 
-// All admin routes require authentication and admin role
+// ✅ Apply authentication and admin middleware to ALL routes
 router.use(authenticate);
-router.use(restrictTo('admin'));
+router.use(requireAdmin);
 
-/**
- * @route   GET /api/admin/stats
- * @desc    Get platform statistics
- * @access  Private/Admin
- */
-router.get('/stats', adminController.getPlatformStats);
+// Dashboard stats
+router.get('/stats', adminController.getStats);
 
-/**
- * @route   GET /api/admin/users
- * @desc    Get all users with filters
- * @access  Private/Admin
- */
-router.get('/users', adminController.getAllUsers);
+// User management
+router.get('/users', adminController.getUsers);
+router.delete('/users/:userId', adminController.deleteUser);
+router.patch('/users/:userId/status', adminController.updateUserStatus);
 
-/**
- * @route   GET /api/admin/users/:id
- * @desc    Get specific user details
- * @access  Private/Admin
- */
-router.get('/users/:id', adminController.getUserById);
-
-/**
- * @route   PUT /api/admin/users/:id/status
- * @desc    Update user status (ban/activate)
- * @access  Private/Admin
- */
-router.put('/users/:id/status', adminController.updateUserStatus);
-
-/**
- * @route   DELETE /api/admin/users/:id
- * @desc    Delete user account
- * @access  Private/Admin
- */
-router.delete('/users/:id', adminController.deleteUser);
-
-/**
- * @route   GET /api/admin/events
- * @desc    Get all events from all users
- * @access  Private/Admin
- */
+// Event management
 router.get('/events', adminController.getAllEvents);
+router.delete('/events/:eventId', adminController.deleteEvent);
 
-/**
- * @route   DELETE /api/admin/events/:id
- * @desc    Delete any event
- * @access  Private/Admin
- */
-router.delete('/events/:id', adminController.deleteEvent);
-
-/**
- * @route   GET /api/admin/logs
- * @desc    Get activity/security logs
- * @access  Private/Admin
- */
+// Security logs
 router.get('/logs', adminController.getLogs);
+
+// System health
+router.get('/system-health', adminController.getSystemHealth);
 
 module.exports = router;
