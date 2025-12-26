@@ -28,18 +28,32 @@ export const requireAdmin = (navigate) => {
 };
 
 /**
+ * Check if current user is admin (no redirect)
+ * @returns {boolean} - True if user is admin, false otherwise
+ */
+export const isAdmin = () => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return false;
+
+  try {
+    const user = JSON.parse(userStr);
+    return user.role === 'admin';
+  } catch (err) {
+    console.error('Error parsing user data:', err);
+    return false;
+  }
+};
+
+/**
  * Format number with commas (handles undefined/null)
  */
 export const formatNumber = (num) => {
-  // Handle undefined, null, or invalid values
   if (num === undefined || num === null || isNaN(num)) {
     return '0';
   }
   
-  // Convert to number if it's a string
   const number = typeof num === 'string' ? parseFloat(num) : num;
   
-  // Check again after conversion
   if (isNaN(number)) {
     return '0';
   }
@@ -51,15 +65,12 @@ export const formatNumber = (num) => {
  * Format bytes to human readable format (handles undefined/null)
  */
 export const formatBytes = (bytes) => {
-  // Handle undefined, null, or invalid values
   if (bytes === undefined || bytes === null || isNaN(bytes)) {
     return '0 B';
   }
 
-  // Convert to number if it's a string
   const numBytes = typeof bytes === 'string' ? parseFloat(bytes) : bytes;
   
-  // Check again after conversion
   if (isNaN(numBytes) || numBytes === 0) {
     return '0 B';
   }
@@ -265,7 +276,6 @@ export const downloadCSV = (data, filename = 'data.csv') => {
     ...data.map(row =>
       headers.map(header => {
         const value = row[header];
-        // Escape commas and quotes in CSV
         if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
           return `"${value.replace(/"/g, '""')}"`;
         }
@@ -319,9 +329,10 @@ export const getInitials = (name) => {
   return name.charAt(0).toUpperCase();
 };
 
-// ✅ FIXED: Assign to variable before exporting
+// ✅ Export all helpers including isAdmin
 const adminHelpers = {
   requireAdmin,
+  isAdmin,
   formatNumber,
   formatBytes,
   getUserStatusBadge,
