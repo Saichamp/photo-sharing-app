@@ -3,9 +3,8 @@
  * View, search, filter, edit, and manage all users
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { FiSearch, FiFilter, FiEdit2, FiTrash2, FiUserX, FiUserCheck, FiKey } from 'react-icons/fi';
 import UserDetailsModal from './UserDetailsModal';
 import './ManageUsers.css';
 
@@ -25,8 +24,8 @@ const ManageUsers = () => {
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-  // Fetch users
-  const fetchUsers = async () => {
+  // ✅ FIXED: Wrap fetchUsers in useCallback
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -54,12 +53,12 @@ const ManageUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL, currentPage, searchTerm, roleFilter, statusFilter, planFilter]);
 
   // Fetch users on mount and when filters change
   useEffect(() => {
     fetchUsers();
-  }, [currentPage, searchTerm, roleFilter, statusFilter, planFilter]);
+  }, [fetchUsers]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -144,7 +143,7 @@ const ManageUsers = () => {
       {/* Search and Filters */}
       <div className="search-filter-section">
         <div className="search-bar">
-          <FiSearch className="search-icon" />
+          <span className="search-icon">🔍</span>
           <input
             type="text"
             placeholder="Search by name or email..."
@@ -157,7 +156,7 @@ const ManageUsers = () => {
           className="filter-toggle-btn"
           onClick={() => setShowFilters(!showFilters)}
         >
-          <FiFilter /> Filters {(roleFilter || statusFilter || planFilter) && '(Active)'}
+          🔧 Filters {(roleFilter || statusFilter || planFilter) && '(Active)'}
         </button>
       </div>
 
@@ -252,7 +251,7 @@ const ManageUsers = () => {
                           onClick={() => handleViewUser(user)}
                           title="View Details"
                         >
-                          <FiEdit2 />
+                          ✏️
                         </button>
                         
                         {user.role !== 'admin' && (
@@ -262,7 +261,7 @@ const ManageUsers = () => {
                               onClick={() => handleToggleStatus(user._id, user.isActive)}
                               title={user.isActive ? 'Deactivate User' : 'Activate User'}
                             >
-                              {user.isActive ? <FiUserX /> : <FiUserCheck />}
+                              {user.isActive ? '🚫' : '✅'}
                             </button>
 
                             <button
@@ -270,7 +269,7 @@ const ManageUsers = () => {
                               onClick={() => handleDeleteUser(user._id)}
                               title="Delete User"
                             >
-                              <FiTrash2 />
+                              🗑️
                             </button>
                           </>
                         )}

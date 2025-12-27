@@ -642,3 +642,100 @@ exports.resetUserPassword = async (req, res) => {
     });
   }
 };
+/**
+ * Update user details (admin only)
+ */
+exports.updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, role } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (role) user.role = role;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+      data: { user }
+    });
+
+    logger.info('User updated by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      updatedUserId: userId
+    });
+  } catch (error) {
+    logger.error('Error updating user', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Reset user password (admin only)
+ */
+exports.resetUserPassword = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    
+    // Update user password
+    user.password = tempPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+      data: {
+        tempPassword,
+        message: 'Temporary password generated. User should change it on next login.'
+      }
+    });
+
+    logger.info('Password reset by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      resetUserId: userId
+    });
+  } catch (error) {
+    logger.error('Error resetting password', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message
+    });
+  }
+};
