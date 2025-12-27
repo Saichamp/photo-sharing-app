@@ -8,7 +8,7 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { authenticate, requireAdmin } = require('../middleware/authenticate');
 
-// ✅ Apply authentication and admin middleware to ALL routes
+// Apply authentication and admin middleware to ALL routes
 router.use(authenticate);
 router.use(requireAdmin);
 
@@ -17,8 +17,10 @@ router.get('/stats', adminController.getStats);
 
 // User management
 router.get('/users', adminController.getUsers);
-router.delete('/users/:userId', adminController.deleteUser);
+router.put('/users/:userId', adminController.updateUser);              // ✅ NEW
 router.patch('/users/:userId/status', adminController.updateUserStatus);
+router.delete('/users/:userId', adminController.deleteUser);
+router.post('/users/:userId/reset-password', adminController.resetUserPassword); // ✅ NEW
 
 // Event management
 router.get('/events', adminController.getAllEvents);

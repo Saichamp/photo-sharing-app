@@ -41,11 +41,11 @@ exports.getStats = async (req, res) => {
     // Count all registrations
     const totalRegistrations = await Registration.countDocuments();
 
-    // Get top organizers
+    // Get top organizers (using userId field)
     const topOrganizers = await Event.aggregate([
       {
         $group: {
-          _id: '$organizer',
+          _id: '$userId',  // ✅ Changed from '$organizer' to '$userId'
           eventCount: { $sum: 1 }
         }
       },
@@ -72,9 +72,9 @@ exports.getStats = async (req, res) => {
 
     // Get photo count for top organizers
     for (let organizer of topOrganizers) {
-      const events = await Event.find({ organizer: organizer._id });
+      const events = await Event.find({ userId: organizer._id });  // ✅ Changed to userId
       const eventIds = events.map(e => e._id);
-      organizer.photoCount = await Photo.countDocuments({ event: { $in: eventIds } });
+      organizer.photoCount = await Photo.countDocuments({ eventId: { $in: eventIds } });  // ✅ Changed to eventId
     }
 
     res.status(200).json({
@@ -89,23 +89,21 @@ exports.getStats = async (req, res) => {
         totalPhotos,
         totalStorage,
         totalRegistrations,
-        revenue: 0, // Placeholder for future billing
-        securityLogs: 0, // Placeholder
+        revenue: 0,
+        securityLogs: 0,
         systemHealth: 'Good',
-        apiCalls: 0, // Placeholder
+        apiCalls: 0,
         topOrganizers
       }
     });
 
     logger.info('Admin stats retrieved', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      adminId: req.user?.id
+      adminId: req.user?._id
     });
   } catch (error) {
     logger.error('Error fetching admin stats', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
       error: error.message,
       stack: error.stack
     });
@@ -160,7 +158,7 @@ exports.getUsers = async (req, res) => {
 
     // Add event count for each user
     for (let user of users) {
-      user._doc.eventCount = await Event.countDocuments({ organizer: user._id });
+      user._doc.eventCount = await Event.countDocuments({ userId: user._id });  // ✅ Changed to userId
     }
 
     res.status(200).json({
@@ -178,14 +176,12 @@ exports.getUsers = async (req, res) => {
 
     logger.info('All users retrieved', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      adminId: req.user?.id,
+      adminId: req.user?._id,
       count: users.length
     });
   } catch (error) {
     logger.error('Error fetching users', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
       error: error.message
     });
 
@@ -209,6 +205,8 @@ exports.getAllEvents = async (req, res) => {
       limit = 10
     } = req.query;
 
+    console.log('📊 Admin getAllEvents called:', { search, status, page, limit });
+
     // Build filter query
     const filter = {};
     
@@ -222,17 +220,30 @@ exports.getAllEvents = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const totalEvents = await Event.countDocuments(filter);
 
-    // Fetch events with organizer info
+    console.log(`📈 Total events found: ${totalEvents}`);
+
+    // ✅ FIXED: Use 'userId' instead of 'organizer'
     const events = await Event.find(filter)
-      .populate('organizer', 'name email')
+      .populate('userId', 'name email')  // ✅ Changed from 'organizer' to 'userId'
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
+    console.log(`✅ Events fetched: ${events.length}`);
+
     // Add photo and registration counts
     for (let event of events) {
-      event._doc.photoCount = await Photo.countDocuments({ event: event._id });
-      event._doc.registrationCount = await Registration.countDocuments({ event: event._id });
+      event._doc.photoCount = await Photo.countDocuments({ eventId: event._id });  // ✅ Changed to eventId
+      event._doc.registrationCount = await Registration.countDocuments({ eventId: event._id });  // ✅ Changed to eventId
+      
+      // ✅ Add organizer info (rename userId to organizer for frontend)
+      if (event.userId) {
+        event._doc.organizer = {
+          _id: event.userId._id,
+          name: event.userId.name,
+          email: event.userId.email
+        };
+      }
     }
 
     res.status(200).json({
@@ -250,15 +261,15 @@ exports.getAllEvents = async (req, res) => {
 
     logger.info('All events retrieved', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      adminId: req.user?.id,
+      adminId: req.user?._id,
       count: events.length
     });
   } catch (error) {
+    console.error('❌ Error in getAllEvents:', error);
     logger.error('Error fetching events', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
 
     res.status(500).json({
@@ -276,7 +287,6 @@ exports.deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Find user
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -285,7 +295,6 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    // Don't allow deleting other admins
     if (user.role === 'admin') {
       return res.status(403).json({
         success: false,
@@ -293,18 +302,18 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    // Delete user's events
-    const userEvents = await Event.find({ organizer: userId });
+    // ✅ Delete user's events (using userId)
+    const userEvents = await Event.find({ userId: userId });
     const eventIds = userEvents.map(e => e._id);
 
-    // Delete photos associated with events
-    await Photo.deleteMany({ event: { $in: eventIds } });
+    // Delete photos (using eventId)
+    await Photo.deleteMany({ eventId: { $in: eventIds } });
 
-    // Delete registrations
-    await Registration.deleteMany({ event: { $in: eventIds } });
+    // Delete registrations (using eventId)
+    await Registration.deleteMany({ eventId: { $in: eventIds } });
 
     // Delete events
-    await Event.deleteMany({ organizer: userId });
+    await Event.deleteMany({ userId: userId });
 
     // Delete user
     await User.findByIdAndDelete(userId);
@@ -316,14 +325,12 @@ exports.deleteUser = async (req, res) => {
 
     logger.info('User deleted by admin', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      adminId: req.user?.id,
+      adminId: req.user?._id,
       deletedUserId: userId
     });
   } catch (error) {
     logger.error('Error deleting user', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
       error: error.message
     });
 
@@ -351,7 +358,6 @@ exports.updateUserStatus = async (req, res) => {
       });
     }
 
-    // Don't allow changing status of other admins
     if (user.role === 'admin') {
       return res.status(403).json({
         success: false,
@@ -370,15 +376,13 @@ exports.updateUserStatus = async (req, res) => {
 
     logger.info('User status updated by admin', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      adminId: req.user?.id,
+      adminId: req.user?._id,
       updatedUserId: userId,
       newStatus: isActive
     });
   } catch (error) {
     logger.error('Error updating user status', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
       error: error.message
     });
 
@@ -405,11 +409,11 @@ exports.deleteEvent = async (req, res) => {
       });
     }
 
-    // Delete photos
-    await Photo.deleteMany({ event: eventId });
+    // ✅ Delete photos (using eventId)
+    await Photo.deleteMany({ eventId: eventId });
 
-    // Delete registrations
-    await Registration.deleteMany({ event: eventId });
+    // ✅ Delete registrations (using eventId)
+    await Registration.deleteMany({ eventId: eventId });
 
     // Delete event
     await Event.findByIdAndDelete(eventId);
@@ -421,14 +425,12 @@ exports.deleteEvent = async (req, res) => {
 
     logger.info('Event deleted by admin', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
-      adminId: req.user?.id,
+      adminId: req.user?._id,
       deletedEventId: eventId
     });
   } catch (error) {
     logger.error('Error deleting event', {
       service: 'photomanea-backend',
-      environment: process.env.NODE_ENV || 'development',
       error: error.message
     });
 
@@ -453,8 +455,6 @@ exports.getLogs = async (req, res) => {
       limit = 50
     } = req.query;
 
-    // For now, return mock data
-    // In production, you'd query your logging system or database
     const mockLogs = [
       {
         timestamp: new Date(),
@@ -538,6 +538,106 @@ exports.getSystemHealth = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch system health',
+      error: error.message
+    });
+  }
+};
+/**
+ * Update user details (admin only)
+ */
+exports.updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, role } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (role) user.role = role;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+      data: { user }
+    });
+
+    logger.info('User updated by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      updatedUserId: userId
+    });
+  } catch (error) {
+    logger.error('Error updating user', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Reset user password (admin only)
+ */
+exports.resetUserPassword = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    
+    // Update user password
+    user.password = tempPassword;
+    await user.save();
+
+    // TODO: Send email to user with temp password
+    // For now, return it in response (NOT SECURE for production!)
+    
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+      data: {
+        tempPassword, // Remove this in production!
+        message: 'Temporary password generated. User should change it on next login.'
+      }
+    });
+
+    logger.info('Password reset by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      resetUserId: userId
+    });
+  } catch (error) {
+    logger.error('Error resetting password', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
       error: error.message
     });
   }
