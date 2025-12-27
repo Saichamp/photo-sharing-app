@@ -31,5 +31,7 @@ router.get('/logs', adminController.getLogs);
 
 // System health
 router.get('/system-health', adminController.getSystemHealth);
+router.put('/users/:userId', adminController.updateUser);
+router.post('/users/:userId/reset-password', adminController.resetUserPassword);
 
 module.exports = router;

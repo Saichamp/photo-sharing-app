@@ -20,7 +20,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ✅ FIXED: Use useCallback to memoize fetchDashboardData
+  // ✅ Fetch dashboard data
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -33,7 +33,7 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // No dependencies - only runs once
+  }, []);
 
   // ✅ Check admin access on mount
   useEffect(() => {
@@ -96,98 +96,63 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-{/* Main Stats Grid */}
-<div className="stats-grid">
-  {/* Total Users */}
-  <div className="stat-card stat-users">
-    <div className="stat-icon">👥</div>
-    <div className="stat-content">
-      <div className="stat-value">{formatNumber(stats?.totalUsers || 0)}</div>
-      <div className="stat-label">Total Users</div>
-      <div className="stat-detail">
-        {stats?.activeUsers || 0} active • {stats?.inactiveUsers || 0} inactive
+      {/* Main Stats Grid */}
+      <div className="stats-grid">
+        {/* Total Users */}
+        <div className="stat-card stat-users">
+          <div className="stat-icon">👥</div>
+          <div className="stat-content">
+            <div className="stat-value">{formatNumber(stats.totalUsers || 0)}</div>
+            <div className="stat-label">Total Users</div>
+            <div className="stat-detail">
+              {stats.activeUsers || 0} active • {stats.inactiveUsers || 0} inactive
+            </div>
+          </div>
+        </div>
+
+        {/* Total Events */}
+        <div className="stat-card stat-events">
+          <div className="stat-icon">🎉</div>
+          <div className="stat-content">
+            <div className="stat-value">{formatNumber(stats.totalEvents || 0)}</div>
+            <div className="stat-label">Total Events</div>
+            <div className="stat-detail">
+              {stats.activeEvents || 0} active • {stats.completedEvents || 0} completed
+            </div>
+          </div>
+        </div>
+
+        {/* Total Photos */}
+        <div className="stat-card stat-photos">
+          <div className="stat-icon">📸</div>
+          <div className="stat-content">
+            <div className="stat-value">{formatNumber(stats.totalPhotos || 0)}</div>
+            <div className="stat-label">Total Photos</div>
+            <div className="stat-detail">
+              {formatBytes(stats.totalStorage || 0)} storage used
+            </div>
+          </div>
+        </div>
+
+        {/* Total Registrations */}
+        <div className="stat-card stat-registrations">
+          <div className="stat-icon">📝</div>
+          <div className="stat-content">
+            <div className="stat-value">{formatNumber(stats.totalRegistrations || 0)}</div>
+            <div className="stat-label">Total Registrations</div>
+            <div className="stat-detail">
+              Guest registrations across all events
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-
-  {/* Total Events */}
-  <div className="stat-card stat-events">
-    <div className="stat-icon">🎉</div>
-    <div className="stat-content">
-      <div className="stat-value">{formatNumber(stats?.totalEvents || 0)}</div>
-      <div className="stat-label">Total Events</div>
-      <div className="stat-detail">
-        {stats?.activeEvents || 0} active • {stats?.completedEvents || 0} completed
-      </div>
-    </div>
-  </div>
-
-  {/* Total Photos */}
-  <div className="stat-card stat-photos">
-    <div className="stat-icon">📸</div>
-    <div className="stat-content">
-      <div className="stat-value">{formatNumber(stats?.totalPhotos || 0)}</div>
-      <div className="stat-label">Total Photos</div>
-      <div className="stat-detail">
-        {formatBytes(stats?.totalStorage || 0)} storage used
-      </div>
-    </div>
-  </div>
-
-  {/* Total Registrations */}
-  <div className="stat-card stat-registrations">
-    <div className="stat-icon">📝</div>
-    <div className="stat-content">
-      <div className="stat-value">{formatNumber(stats?.totalRegistrations || 0)}</div>
-      <div className="stat-label">Total Registrations</div>
-      <div className="stat-detail">
-        Guest registrations across all events
-      </div>
-    </div>
-  </div>
-</div>
-
-{/* Secondary Stats */}
-<div className="secondary-stats">
-  <div className="stat-box">
-    <div className="stat-icon-small">💰</div>
-    <div className="stat-info">
-      <div className="stat-number">{formatNumber(stats?.revenue || 0)}</div>
-      <div className="stat-text">Total Revenue</div>
-    </div>
-  </div>
-
-  <div className="stat-box">
-    <div className="stat-icon-small">🔐</div>
-    <div className="stat-info">
-      <div className="stat-number">{formatNumber(stats?.securityLogs || 0)}</div>
-      <div className="stat-text">Security Logs</div>
-    </div>
-  </div>
-
-  <div className="stat-box">
-    <div className="stat-icon-small">⚡</div>
-    <div className="stat-info">
-      <div className="stat-number">{stats?.systemHealth || 'Good'}</div>
-      <div className="stat-text">System Health</div>
-    </div>
-  </div>
-
-  <div className="stat-box">
-    <div className="stat-icon-small">📊</div>
-    <div className="stat-info">
-      <div className="stat-number">{stats?.apiCalls || 0}</div>
-      <div className="stat-text">API Calls Today</div>
-    </div>
-  </div>
-</div>
 
       {/* Secondary Stats */}
       <div className="secondary-stats">
         <div className="stat-box">
           <div className="stat-icon-small">💰</div>
           <div className="stat-info">
-            <div className="stat-number">{formatNumber(stats.revenue || 0)}</div>
+            <div className="stat-number">${formatNumber(stats.revenue || 0)}</div>
             <div className="stat-text">Total Revenue</div>
           </div>
         </div>
@@ -211,7 +176,7 @@ const AdminDashboard = () => {
         <div className="stat-box">
           <div className="stat-icon-small">📊</div>
           <div className="stat-info">
-            <div className="stat-number">{stats.apiCalls || 0}</div>
+            <div className="stat-number">{formatNumber(stats.apiCalls || 0)}</div>
             <div className="stat-text">API Calls Today</div>
           </div>
         </div>
@@ -309,6 +274,22 @@ const AdminDashboard = () => {
           >
             <span className="action-icon">📋</span>
             <span className="action-text">Security Logs</span>
+          </button>
+
+          <button 
+            onClick={() => navigate('/admin/system')}
+            className="action-btn action-system"
+          >
+            <span className="action-icon">⚙️</span>
+            <span className="action-text">System Health</span>
+          </button>
+
+          <button 
+            onClick={() => navigate('/admin/settings')}
+            className="action-btn action-settings"
+          >
+            <span className="action-icon">🔧</span>
+            <span className="action-text">Settings</span>
           </button>
         </div>
       </div>

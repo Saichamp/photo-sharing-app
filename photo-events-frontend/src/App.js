@@ -37,6 +37,7 @@ import API from './services/api'; // or the correct path to your API client
 import SecurityLogs from './pages/Admin/SecurityLogs';
 
 import SystemMonitor from './pages/Admin/SystemMonitor';
+import ManageUsers from './pages/Admin/ManageUsers';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -85,7 +86,9 @@ function AppRoutes() {
               <RegisterPage />
             </PublicRoute>
           }
+          
         />
+      <Route path="/admin/users" element={<ManageUsers />} />
 
         {/* ================================
             GUEST REGISTRATION ROUTES
