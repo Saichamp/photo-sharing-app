@@ -739,3 +739,367 @@ exports.resetUserPassword = async (req, res) => {
     });
   }
 };
+/**
+ * Get all events (admin)
+ */
+exports.getAllEvents = async (req, res) => {
+  try {
+    const { search, status, page = 1, limit = 10 } = req.query;
+
+    // Build query
+    const query = {};
+    
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { location: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Get events with pagination
+    const events = await Event.find(query)
+      .populate('organizer', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    // Get counts for each event
+    const eventsWithCounts = await Promise.all(
+      events.map(async (event) => {
+        const registrationCount = await Registration.countDocuments({ event: event._id });
+        const photoCount = await Photo.countDocuments({ event: event._id });
+        
+        return {
+          ...event,
+          registrationCount,
+          photoCount
+        };
+      })
+    );
+
+    const total = await Event.countDocuments(query);
+
+    // Get stats
+    const stats = {
+      active: await Event.countDocuments({ status: 'active' }),
+      completed: await Event.countDocuments({ status: 'completed' }),
+      cancelled: await Event.countDocuments({ status: 'cancelled' })
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        events: eventsWithCounts,
+        pagination: {
+          currentPage: Number(page),
+          totalPages: Math.ceil(total / limit),
+          totalEvents: total,
+          limit: Number(limit)
+        },
+        stats
+      }
+    });
+
+    logger.info('All events retrieved', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      count: events.length
+    });
+  } catch (error) {
+    logger.error('Error fetching all events', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch events',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Update event (admin)
+ */
+exports.updateEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { name, description, location, date, status } = req.body;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    // Update fields
+    if (name) event.name = name;
+    if (description) event.description = description;
+    if (location) event.location = location;
+    if (date) event.date = date;
+    if (status) event.status = status;
+
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Event updated successfully',
+      data: { event }
+    });
+
+    logger.info('Event updated by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      eventId
+    });
+  } catch (error) {
+    logger.error('Error updating event', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update event',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Delete event (admin)
+ */
+exports.deleteEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    // Delete all related data
+    await Registration.deleteMany({ event: eventId });
+    await Photo.deleteMany({ event: eventId });
+    
+    // Delete event
+    await Event.findByIdAndDelete(eventId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Event and all related data deleted successfully'
+    });
+
+    logger.info('Event deleted by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      eventId
+    });
+  } catch (error) {
+    logger.error('Error deleting event', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete event',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get all photos (admin)
+ */
+exports.getAllPhotos = async (req, res) => {
+  try {
+    const { search, event, page = 1, limit = 20 } = req.query;
+
+    // Build query
+    const query = {};
+    
+    if (event) {
+      query.event = event;
+    }
+
+    // If search, find events matching search and use their IDs
+    if (search) {
+      const matchingEvents = await Event.find({
+        name: { $regex: search, $options: 'i' }
+      }).select('_id');
+      
+      if (matchingEvents.length > 0) {
+        query.event = { $in: matchingEvents.map(e => e._id) };
+      }
+    }
+
+    // Get photos with pagination
+    const photos = await Photo.find(query)
+      .populate('event', 'name location date')
+      .populate('uploadedBy', 'name email')
+      .sort({ uploadedAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const total = await Photo.countDocuments(query);
+
+    // Get stats
+    const stats = {
+      total: await Photo.countDocuments(),
+      withFaces: await Photo.countDocuments({ facesDetected: { $gt: 0 } }),
+      withoutFaces: await Photo.countDocuments({ facesDetected: 0 }),
+      totalSize: await Photo.aggregate([
+        { $group: { _id: null, total: { $sum: '$size' } } }
+      ]).then(result => result[0]?.total || 0)
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        photos,
+        pagination: {
+          currentPage: Number(page),
+          totalPages: Math.ceil(total / limit),
+          totalPhotos: total,
+          limit: Number(limit)
+        },
+        stats
+      }
+    });
+
+    logger.info('All photos retrieved', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      count: photos.length
+    });
+  } catch (error) {
+    logger.error('Error fetching all photos', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch photos',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Delete photo (admin)
+ */
+exports.deletePhoto = async (req, res) => {
+  try {
+    const { photoId } = req.params;
+
+    const photo = await Photo.findById(photoId);
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo not found'
+      });
+    }
+
+    // Delete physical file
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '..', photo.url);
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Delete from database
+    await Photo.findByIdAndDelete(photoId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Photo deleted successfully'
+    });
+
+    logger.info('Photo deleted by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      photoId
+    });
+  } catch (error) {
+    logger.error('Error deleting photo', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete photo',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Bulk delete photos (admin)
+ */
+exports.bulkDeletePhotos = async (req, res) => {
+  try {
+    const { photoIds } = req.body;
+
+    if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide photo IDs to delete'
+      });
+    }
+
+    const photos = await Photo.find({ _id: { $in: photoIds } });
+
+    // Delete physical files
+    const fs = require('fs');
+    const path = require('path');
+    
+    for (const photo of photos) {
+      const filePath = path.join(__dirname, '..', photo.url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // Delete from database
+    await Photo.deleteMany({ _id: { $in: photoIds } });
+
+    res.status(200).json({
+      success: true,
+      message: `${photos.length} photo(s) deleted successfully`
+    });
+
+    logger.info('Bulk photos deleted by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      count: photos.length
+    });
+  } catch (error) {
+    logger.error('Error bulk deleting photos', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete photos',
+      error: error.message
+    });
+  }
+};
