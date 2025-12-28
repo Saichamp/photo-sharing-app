@@ -34,4 +34,23 @@ router.get('/system-health', adminController.getSystemHealth);
 router.put('/users/:userId', adminController.updateUser);
 router.post('/users/:userId/reset-password', adminController.resetUserPassword);
 
+
+// Get all events (admin)
+router.get('/events', adminController.getAllEvents);
+
+// Update event
+router.put('/events/:eventId', adminController.updateEvent);
+
+// Delete event
+router.delete('/events/:eventId', adminController.deleteEvent);
+
+// Get all photos (admin)
+router.get('/photos', adminController.getAllPhotos);
+
+// Delete photo
+router.delete('/photos/:photoId', adminController.deletePhoto);
+
+// Bulk delete photos
+router.post('/photos/bulk-delete', adminController.bulkDeletePhotos);
+
 module.exports = router;

@@ -38,6 +38,9 @@ import SecurityLogs from './pages/Admin/SecurityLogs';
 
 import SystemMonitor from './pages/Admin/SystemMonitor';
 import ManageUsers from './pages/Admin/ManageUsers';
+import ManageEvents from './pages/Admin/ManageEvents';
+import ManagePhotos from './pages/Admin/ManagePhotos';
+
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -89,6 +92,10 @@ function AppRoutes() {
           
         />
       <Route path="/admin/users" element={<ManageUsers />} />
+      <Route path="/admin/events" element={<ManageEvents />} />
+      <Route path="/admin/photos" element={<ManagePhotos />} />
+
+
 
         {/* ================================
             GUEST REGISTRATION ROUTES
