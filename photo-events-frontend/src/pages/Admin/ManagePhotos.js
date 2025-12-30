@@ -28,13 +28,14 @@ const ManagePhotos = () => {
   });
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
   // Fetch photos
   const fetchPhotos = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       const response = await axios.get(`${API_URL}/admin/photos`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
@@ -48,7 +49,7 @@ const ManagePhotos = () => {
       if (response.data.success) {
         setPhotos(response.data.data.photos);
         setTotalPages(response.data.data.pagination.totalPages);
-        
+
         if (response.data.data.stats) {
           setStats(response.data.data.stats);
         }
@@ -65,6 +66,7 @@ const ManagePhotos = () => {
   const fetchEvents = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
+
       const response = await axios.get(`${API_URL}/admin/events`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { limit: 100 }
@@ -89,6 +91,7 @@ const ManagePhotos = () => {
     const timer = setTimeout(() => {
       setCurrentPage(1);
     }, 500);
+
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -142,8 +145,8 @@ const ManagePhotos = () => {
 
   // Toggle photo selection
   const togglePhotoSelection = (photoId) => {
-    setSelectedPhotos(prev => 
-      prev.includes(photoId) 
+    setSelectedPhotos(prev =>
+      prev.includes(photoId)
         ? prev.filter(id => id !== photoId)
         : [...prev, photoId]
     );
@@ -177,54 +180,66 @@ const ManagePhotos = () => {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  // ✅ Get proper image URL
+  const getImageUrl = (photo) => {
+    const imagePath = photo.url || photo.path;
+    if (!imagePath) return null;
+    
+    // If already full URL, return it
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Otherwise prepend base URL
+    return `${BASE_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
   };
 
   return (
     <div className="manage-photos-container">
+      {/* Header */}
       <div className="manage-photos-header">
         <div className="header-left">
-          <h1>📸 Manage Photos</h1>
+          <h1>📸 Photo Manager</h1>
           <p>View and manage all photos across events</p>
         </div>
+
         <div className="header-stats">
           <div className="stat-card total">
             <span className="stat-label">Total Photos</span>
-            <span className="stat-value">{stats.total || 0}</span>
+            <span className="stat-value">{stats.total}</span>
           </div>
+
           <div className="stat-card faces">
             <span className="stat-label">With Faces</span>
-            <span className="stat-value">{stats.withFaces || 0}</span>
+            <span className="stat-value">{stats.withFaces}</span>
           </div>
+
           <div className="stat-card storage">
-            <span className="stat-label">Total Size</span>
-            <span className="stat-value">{formatFileSize(stats.totalSize || 0)}</span>
+            <span className="stat-label">Storage</span>
+            <span className="stat-value">{formatFileSize(stats.totalSize)}</span>
           </div>
         </div>
       </div>
 
-      {/* Bulk Actions */}
+      {/* Bulk Actions Bar */}
       {selectedPhotos.length > 0 && (
         <div className="bulk-actions-bar">
           <span className="bulk-info">
             {selectedPhotos.length} photo(s) selected
           </span>
-          <button 
-            className="bulk-delete-btn"
-            onClick={handleBulkDelete}
-          >
-            🗑️ Delete Selected
+          <button onClick={handleBulkDelete} className="bulk-delete-btn">
+            <span>🗑️</span> Delete Selected
           </button>
-          <button 
-            className="bulk-clear-btn"
-            onClick={() => setSelectedPhotos([])}
-          >
-            Clear Selection
+          <button onClick={() => setSelectedPhotos([])} className="bulk-clear-btn">
+            ✖ Clear Selection
           </button>
         </div>
       )}
 
-      {/* Search and Filters */}
+      {/* Search & Filter */}
       <div className="search-filter-section">
         <div className="search-bar">
           <span className="search-icon">🔍</span>
@@ -236,18 +251,16 @@ const ManagePhotos = () => {
           />
         </div>
 
-        <button 
-          className="filter-toggle-btn"
+        <button
           onClick={() => setShowFilters(!showFilters)}
+          className="filter-toggle-btn"
         >
-          🔧 Filters {eventFilter && '(Active)'}
+          <span>🎛️</span> Filters
         </button>
 
-        <button 
-          className="select-all-btn"
-          onClick={toggleSelectAll}
-        >
-          {selectedPhotos.length === photos.length ? '☑️' : '☐'} Select All
+        <button onClick={toggleSelectAll} className="select-all-btn">
+          <span>{selectedPhotos.length === photos.length ? '☑' : '☐'}</span>
+          {selectedPhotos.length === photos.length ? 'Deselect All' : 'Select All'}
         </button>
       </div>
 
@@ -263,7 +276,7 @@ const ManagePhotos = () => {
             ))}
           </select>
 
-          <button className="clear-filters-btn" onClick={handleClearFilters}>
+          <button onClick={handleClearFilters} className="clear-filters-btn">
             Clear Filters
           </button>
         </div>
@@ -277,18 +290,19 @@ const ManagePhotos = () => {
         </div>
       ) : photos.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">📸</div>
-          <h3>No Photos Found</h3>
+          <div className="empty-icon">📷</div>
+          <h3>No photos found</h3>
           <p>No photos match your search criteria</p>
         </div>
       ) : (
         <>
           <div className="photos-grid">
             {photos.map((photo) => (
-              <div 
-                key={photo._id} 
+              <div
+                key={photo._id}
                 className={`photo-card ${selectedPhotos.includes(photo._id) ? 'selected' : ''}`}
               >
+                {/* Select Checkbox */}
                 <div className="photo-select">
                   <input
                     type="checkbox"
@@ -297,18 +311,18 @@ const ManagePhotos = () => {
                   />
                 </div>
 
-                <div 
-                  className="photo-thumbnail"
-                  onClick={() => handleViewPhoto(photo)}
-                >
-                  <img 
-                    src={`${API_URL.replace('/api', '')}${photo.url}`}
+                {/* ✅ FIXED: Photo Thumbnail with proper URL */}
+                <div className="photo-thumbnail" onClick={() => handleViewPhoto(photo)}>
+                  <img
+                    src={getImageUrl(photo)}
                     alt={photo.filename}
                     onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/300x200?text=Image+Not+Found';
+                      e.target.onerror = null;
+                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="280" height="220"%3E%3Crect fill="%23ddd" width="280" height="220"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif" font-size="18"%3ENo Image%3C/text%3E%3C/svg%3E';
                     }}
                   />
-                  
+
+                  {/* Face Badge */}
                   {photo.facesDetected > 0 && (
                     <div className="face-badge">
                       👤 {photo.facesDetected}
@@ -316,31 +330,35 @@ const ManagePhotos = () => {
                   )}
                 </div>
 
+                {/* Photo Info */}
                 <div className="photo-info">
                   <div className="photo-event">
                     🎉 {photo.event?.name || 'Unknown Event'}
                   </div>
+
                   <div className="photo-meta">
                     <span className="photo-size">
-                      {formatFileSize(photo.size || 0)}
+                      📁 {formatFileSize(photo.size)}
                     </span>
                     <span className="photo-date">
-                      {new Date(photo.uploadedAt).toLocaleDateString()}
+                      📅 {new Date(photo.uploadedAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
 
+                {/* Photo Actions */}
                 <div className="photo-actions">
                   <button
-                    className="action-btn view"
                     onClick={() => handleViewPhoto(photo)}
+                    className="action-btn view"
                     title="View Details"
                   >
                     👁️
                   </button>
+
                   <button
-                    className="action-btn delete"
                     onClick={() => handleDeletePhoto(photo._id)}
+                    className="action-btn delete"
                     title="Delete Photo"
                   >
                     🗑️
@@ -354,23 +372,23 @@ const ManagePhotos = () => {
           {totalPages > 1 && (
             <div className="pagination">
               <button
-                className="pagination-btn"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                onClick={() => setCurrentPage(currentPage - 1)}
+                className="pagination-btn"
               >
-                Previous
+                ← Previous
               </button>
-              
+
               <span className="pagination-info">
                 Page {currentPage} of {totalPages}
               </span>
 
               <button
-                className="pagination-btn"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(currentPage + 1)}
+                className="pagination-btn"
               >
-                Next
+                Next →
               </button>
             </div>
           )}
@@ -378,18 +396,15 @@ const ManagePhotos = () => {
       )}
 
       {/* Photo Preview Modal */}
-      {showModal && (
+      {showModal && selectedPhoto && (
         <PhotoPreviewModal
           photo={selectedPhoto}
           onClose={() => {
             setShowModal(false);
             setSelectedPhoto(null);
           }}
-          onDelete={(photoId) => {
-            handleDeletePhoto(photoId);
-            setShowModal(false);
-            setSelectedPhoto(null);
-          }}
+          onDelete={handleDeletePhoto}
+          getImageUrl={getImageUrl}
         />
       )}
     </div>

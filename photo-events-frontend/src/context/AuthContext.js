@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import authService from '../services/authService';
 
 /**
@@ -28,31 +28,45 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   /**
-   * Check authentication status on mount
-   */
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  /**
    * Check if user is authenticated and load user data
    */
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const token = authService.getToken();
       const storedUser = authService.getUser();
       
-      if (token && storedUser) {
-        // User data exists in localStorage
+      if (!token) {
+        // No token, user is not authenticated
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      if (storedUser) {
+        // Set cached user data immediately
         setUser(storedUser);
+      }
+      
+      // Try to fetch fresh user data from server
+      try {
+        const response = await authService.getProfile();
+        const freshUser = response.data.user || response.data;
+        setUser(freshUser);
         
-        // Optionally fetch fresh user data from server
-        try {
-          const response = await authService.getProfile();
-          setUser(response.data);
-        } catch (err) {
-          // If profile fetch fails, use stored data
-          console.warn('Failed to fetch fresh profile, using cached data');
+        // Update cached user data
+        localStorage.setItem('user', JSON.stringify(freshUser));
+      } catch (err) {
+        console.warn('Failed to fetch fresh profile:', err.message);
+        
+        // If 401 Unauthorized, token is invalid
+        if (err.response?.status === 401) {
+          console.log('Token expired or invalid, clearing auth data');
+          authService.clearTokens();
+          setUser(null);
+        } else if (storedUser) {
+          // For other errors, use cached data
+          console.log('Using cached user data');
+          setUser(storedUser);
         }
       }
     } catch (err) {
@@ -63,7 +77,14 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  /**
+   * Check authentication status on mount
+   */
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   /**
    * Login user with credentials
@@ -84,13 +105,17 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.login(credentials);
       
       // authService.login already stores tokens and user data
-      const userData = response.data.user;
+      const userData = response.data.user || response.data.data?.user;
       setUser(userData);
+      
+      // Store user data
+      localStorage.setItem('user', JSON.stringify(userData));
       
       return response;
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Login failed';
       setError(message);
+      console.error('Login error:', message);
       throw err;
     } finally {
       setLoading(false);
@@ -110,13 +135,17 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.register(userData);
       
       // authService.register already stores tokens and user data
-      const newUser = response.data.user;
+      const newUser = response.data.user || response.data.data?.user;
       setUser(newUser);
+      
+      // Store user data
+      localStorage.setItem('user', JSON.stringify(newUser));
       
       return response;
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Registration failed';
       setError(message);
+      console.error('Registration error:', message);
       throw err;
     } finally {
       setLoading(false);
@@ -129,13 +158,24 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setLoading(true);
-      await authService.logout();
-    } catch (err) {
-      console.error('Logout error:', err);
-      // Continue with logout even if API call fails
-    } finally {
+      
+      // Call logout API (optional, may fail if token expired)
+      try {
+        await authService.logout();
+      } catch (err) {
+        console.warn('Logout API call failed:', err.message);
+        // Continue with local logout even if API fails
+      }
+      
+      // Clear all auth data
+      authService.clearTokens();
       setUser(null);
       setError(null);
+      
+      console.log('User logged out successfully');
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
       setLoading(false);
     }
   };
@@ -149,11 +189,18 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       const response = await authService.updateProfile(updates);
-      setUser(response.data);
+      const updatedUser = response.data.user || response.data.data?.user || response.data;
+      
+      setUser(updatedUser);
+      
+      // Update cached user data
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
       return response;
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Update failed';
       setError(message);
+      console.error('Profile update error:', message);
       throw err;
     }
   };
@@ -171,6 +218,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Password change failed';
       setError(message);
+      console.error('Password change error:', message);
       throw err;
     }
   };
@@ -181,10 +229,23 @@ export const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     try {
       const response = await authService.getProfile();
-      setUser(response.data);
+      const freshUser = response.data.user || response.data.data?.user || response.data;
+      
+      setUser(freshUser);
+      
+      // Update cached user data
+      localStorage.setItem('user', JSON.stringify(freshUser));
+      
       return response;
     } catch (err) {
       console.error('Failed to refresh user data:', err);
+      
+      // If 401, clear auth data
+      if (err.response?.status === 401) {
+        authService.clearTokens();
+        setUser(null);
+      }
+      
       throw err;
     }
   };
@@ -194,6 +255,31 @@ export const AuthProvider = ({ children }) => {
    */
   const clearError = () => {
     setError(null);
+  };
+
+  /**
+   * Check if user has specific role
+   * @param {string} role - Role to check
+   * @returns {boolean}
+   */
+  const hasRole = (role) => {
+    return user?.role === role;
+  };
+
+  /**
+   * Check if user is admin
+   * @returns {boolean}
+   */
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
+  /**
+   * Check if user is organizer
+   * @returns {boolean}
+   */
+  const isOrganizer = () => {
+    return user?.role === 'organizer' || user?.role === 'admin';
   };
 
   // Context value
@@ -208,8 +294,11 @@ export const AuthProvider = ({ children }) => {
     changePassword,
     refreshUser,
     clearError,
-    isAuthenticated: !!user,
-    checkAuth
+    checkAuth,
+    hasRole,
+    isAdmin,
+    isOrganizer,
+    isAuthenticated: !!user
   };
 
   return (

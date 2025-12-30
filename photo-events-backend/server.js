@@ -42,7 +42,7 @@ applySecurity(app); // Helmet, CORS, Rate Limiting, etc.
 logger.info('✅ Security middleware applied');
 
 // ============================================
-// 5. STATIC FILES
+// 5. STATIC FILES (✅ CRITICAL FOR IMAGE DISPLAY)
 // ============================================
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 logger.info('✅ Static file serving configured for /uploads');
@@ -73,6 +73,7 @@ app.get('/api/status', (req, res) => {
     }
   });
 });
+
 // ============================================
 // 7. API ROUTES
 // ============================================
@@ -82,19 +83,19 @@ try {
   // Auth routes
   app.use('/api/auth', require('./routes/auth'));
   logger.info('  ✅ Auth routes loaded');
-  
+
   // Events routes
   app.use('/api/events', require('./routes/events'));
   logger.info('  ✅ Events routes loaded');
-  
+
   // Registration routes
   app.use('/api/registrations', require('./routes/registrations'));
   logger.info('  ✅ Registration routes loaded');
-  
+
   // Photo routes
   app.use('/api/photos', require('./routes/photos'));
   logger.info('  ✅ Photo routes loaded');
-  
+
   // Face matching routes
   app.use('/api/face-matching', require('./routes/faceMatching'));
   logger.info('  ✅ Face matching routes loaded');
@@ -102,7 +103,7 @@ try {
   // Admin routes
   app.use('/api/admin', require('./routes/admin'));
   logger.info('  ✅ Admin routes loaded');
-  
+
   logger.info('✅ All routes loaded successfully');
 } catch (error) {
   logger.error('❌ Failed to load routes:', error);
@@ -115,7 +116,6 @@ try {
 // 8. 404 HANDLER (Route not found)
 // ============================================
 app.use(notFoundHandler);
-
 
 // ============================================
 // 9. GLOBAL ERROR HANDLER (Must be last)
@@ -131,11 +131,11 @@ const startServer = async () => {
     logger.info('🔄 Connecting to MongoDB...');
     await connectDB();
     logger.info('✅ MongoDB connected successfully');
-    
+
     // Start server
     const PORT = config.server.port;
     const HOST = config.server.host;
-    
+
     app.listen(PORT, HOST, () => {
       console.log('');
       console.log('═══════════════════════════════════════════════════════');
@@ -148,45 +148,23 @@ const startServer = async () => {
       console.log(`🎯 Frontend URL: ${config.server.frontendUrl}`);
       console.log('');
       console.log('📡 Available Endpoints:');
-      console.log('   ── SYSTEM ──');
-      console.log('   GET  /api/health              - Health check');
-      console.log('   GET  /api/status              - System status');
+      console.log('  ── SYSTEM ──');
+      console.log('   GET  /api/health - Health check');
+      console.log('   GET  /api/status - System status');
       console.log('');
-      console.log('   ── AUTHENTICATION ──');
-      console.log('   POST /api/auth/register       - Organizer signup');
-      console.log('   POST /api/auth/login          - User login');
-      console.log('   GET  /api/auth/me             - Get profile');
-      console.log('   PUT  /api/auth/update-profile - Update profile');
-      console.log('   PUT  /api/auth/change-password- Change password');
-      console.log('   POST /api/auth/logout         - Logout');
+      console.log('  ── ADMIN ──');
+      console.log('   GET  /api/admin/users - List all users');
+      console.log('   GET  /api/admin/photos - List all photos');
+      console.log('   GET  /api/admin/events - List all events');
+      console.log('   GET  /api/admin/stats - Dashboard stats');
       console.log('');
-      console.log('   ── ADMIN (NEW!) ──');
-      console.log('   GET  /api/admin/users         - List all users');
-      console.log('   GET  /api/admin/users/:id     - Get user details');
-      console.log('   PUT  /api/admin/users/:id     - Update user');
-      console.log('   POST /api/admin/users/:id/reset-password - Reset password');
-      console.log('   PATCH /api/admin/users/:id/toggle-status - Enable/disable');
-      console.log('   GET  /api/admin/stats         - Dashboard stats');
-      console.log('   GET  /api/admin/system/health - System health');
-      console.log('');
-      console.log('   ── EVENTS ──');
-      console.log('   POST /api/events              - Create event');
-      console.log('   GET  /api/events              - List events');
-      console.log('');
-      console.log('   ── GUESTS ──');
-      console.log('   POST /api/registrations       - Guest registration');
-      console.log('');
-      console.log('   ── PHOTOS ──');
-      console.log('   POST /api/photos/upload       - Upload photos');
-      console.log('   POST /api/face-matching       - Face matching');
+      console.log('  ── STATIC FILES ──');
+      console.log('   GET  /uploads/* - Uploaded images/files');
       console.log('═══════════════════════════════════════════════════════');
-      console.log('');
-      console.log('🎉 Phase 1 Complete: Admin Control Panel Active!');
       console.log('');
       
       logger.info(`Server started on ${HOST}:${PORT}`);
     });
-    
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
     console.error('Startup error:', error.message);
