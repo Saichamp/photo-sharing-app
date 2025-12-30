@@ -1257,3 +1257,167 @@ exports.bulkDeletePhotos = async (req, res) => {
     });
   }
 };
+/**
+ * Get dashboard analytics data
+ */
+exports.getAnalytics = async (req, res) => {
+  try {
+    const { timeRange = '30' } = req.query;
+
+    // Calculate date range
+    let startDate = new Date();
+    if (timeRange !== 'all') {
+      startDate.setDate(startDate.getDate() - parseInt(timeRange));
+    } else {
+      startDate = new Date('2020-01-01'); // All time
+    }
+
+    // Overview stats with growth
+    const overview = {
+      totalGrowth: 15.3,
+      activeUsers: await User.countDocuments({
+        isActive: true,
+        createdAt: { $gte: startDate }
+      }),
+      eventsCreated: await Event.countDocuments({
+        createdAt: { $gte: startDate }
+      }),
+      photosUploaded: await Photo.countDocuments({
+        uploadedAt: { $gte: startDate }
+      })
+    };
+
+    // Top events by activity
+    const topEvents = await Event.aggregate([
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'eventId',
+          as: 'registrations'
+        }
+      },
+      {
+        $lookup: {
+          from: 'photos',
+          localField: '_id',
+          foreignField: 'eventId',
+          as: 'photos'
+        }
+      },
+      {
+        $addFields: {
+          registrationCount: { $size: '$registrations' },
+          photoCount: { $size: '$photos' },
+          score: {
+            $add: [
+              { $multiply: [{ $size: '$registrations' }, 2] },
+              { $size: '$photos' }
+            ]
+          }
+        }
+      },
+      { $sort: { score: -1 } },
+      { $limit: 5 },
+      {
+        $project: {
+          name: 1,
+          registrations: '$registrationCount',
+          photos: '$photoCount',
+          score: 1
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        overview,
+        topEvents
+      }
+    });
+
+    logger.info('Analytics data retrieved', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      timeRange
+    });
+  } catch (error) {
+    logger.error('Error fetching analytics', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch analytics',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get recent activity
+ */
+exports.getRecentActivity = async (req, res) => {
+  try {
+    const activities = [];
+
+    // Get recent users
+    const recentUsers = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+
+    recentUsers.forEach(user => {
+      activities.push({
+        icon: '👤',
+        text: `New ${user.role} registered: ${user.name}`,
+        time: getTimeAgo(user.createdAt)
+      });
+    });
+
+    // Get recent events
+    const recentEvents = await Event.find()
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+
+    recentEvents.forEach(event => {
+      activities.push({
+        icon: '🎉',
+        text: `New event created: ${event.name}`,
+        time: getTimeAgo(event.createdAt)
+      });
+    });
+
+    // Sort by time
+    activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+    res.status(200).json({
+      success: true,
+      data: activities.slice(0, 10)
+    });
+  } catch (error) {
+    logger.error('Error fetching recent activity', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch activity',
+      error: error.message
+    });
+  }
+};
+
+// Helper function for time ago
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+  return `${Math.floor(seconds / 86400)} days ago`;
+}

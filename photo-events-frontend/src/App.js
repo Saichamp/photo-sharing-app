@@ -40,6 +40,8 @@ import SystemMonitor from './pages/Admin/SystemMonitor';
 import ManageUsers from './pages/Admin/ManageUsers';
 import ManageEvents from './pages/Admin/ManageEvents';
 import ManagePhotos from './pages/Admin/ManagePhotos';
+import AnalyticsDashboard from './pages/Admin/AnalyticsDashboard';
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -94,9 +96,7 @@ function AppRoutes() {
       <Route path="/admin/users" element={<ManageUsers />} />
       <Route path="/admin/events" element={<ManageEvents />} />
       <Route path="/admin/photos" element={<ManagePhotos />} />
-
-
-
+      <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
         {/* ================================
             GUEST REGISTRATION ROUTES
             ================================ */}
