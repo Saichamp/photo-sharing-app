@@ -53,4 +53,8 @@ router.delete('/photos/:photoId', adminController.deletePhoto);
 // Bulk delete photos
 router.post('/photos/bulk-delete', adminController.bulkDeletePhotos);
 
+// Analytics routes
+router.get('/analytics', adminController.getAnalytics);
+router.get('/recent-activity', adminController.getRecentActivity);
+
 module.exports = router;
