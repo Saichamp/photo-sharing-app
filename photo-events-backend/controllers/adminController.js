@@ -742,6 +742,9 @@ exports.resetUserPassword = async (req, res) => {
 /**
  * Get all events (admin)
  */
+/**
+ * Get all events (admin) - UPDATED VERSION
+ */
 exports.getAllEvents = async (req, res) => {
   try {
     const { search, status, page = 1, limit = 10 } = req.query;
@@ -760,22 +763,35 @@ exports.getAllEvents = async (req, res) => {
       query.status = status;
     }
 
-    // Get events with pagination
+    // Get events with pagination (WITHOUT populate first to avoid errors)
     const events = await Event.find(query)
-      .populate('organizer', 'name email')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .lean();
 
-    // Get counts for each event
+    // Manually get counts and organizer info
     const eventsWithCounts = await Promise.all(
       events.map(async (event) => {
-        const registrationCount = await Registration.countDocuments({ event: event._id });
-        const photoCount = await Photo.countDocuments({ event: event._id });
+        const registrationCount = await Registration.countDocuments({ 
+          eventId: event._id  // or event: event._id, check your Registration model
+        });
+        
+        const photoCount = await Photo.countDocuments({ 
+          eventId: event._id 
+        });
+        
+        // Try to get organizer (handle different field names)
+        let organizer = null;
+        const organizerId = event.organizer || event.userId || event.creator || event.user;
+        
+        if (organizerId) {
+          organizer = await User.findById(organizerId).select('name email').lean();
+        }
         
         return {
           ...event,
+          organizer: organizer || { name: 'Unknown', email: 'N/A' },
           registrationCount,
           photoCount
         };
@@ -813,7 +829,8 @@ exports.getAllEvents = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching all events', {
       service: 'photomanea-backend',
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
 
     res.status(500).json({
@@ -823,6 +840,7 @@ exports.getAllEvents = async (req, res) => {
     });
   }
 };
+
 
 /**
  * Update event (admin)
@@ -923,6 +941,9 @@ exports.deleteEvent = async (req, res) => {
 /**
  * Get all photos (admin)
  */
+/**
+ * Get all photos (admin) - FIXED FOR YOUR SCHEMA
+ */
 exports.getAllPhotos = async (req, res) => {
   try {
     const { search, event, page = 1, limit = 20 } = req.query;
@@ -931,7 +952,7 @@ exports.getAllPhotos = async (req, res) => {
     const query = {};
     
     if (event) {
-      query.event = event;
+      query.eventId = event;  // ✅ Changed from 'event' to 'eventId'
     }
 
     // If search, find events matching search and use their IDs
@@ -941,26 +962,42 @@ exports.getAllPhotos = async (req, res) => {
       }).select('_id');
       
       if (matchingEvents.length > 0) {
-        query.event = { $in: matchingEvents.map(e => e._id) };
+        query.eventId = { $in: matchingEvents.map(e => e._id) };  // ✅ Changed to 'eventId'
       }
     }
 
     // Get photos with pagination
     const photos = await Photo.find(query)
-      .populate('event', 'name location date')
-      .populate('uploadedBy', 'name email')
+      .populate('eventId', 'name location date')  // ✅ Changed from 'event' to 'eventId'
+      .populate('userId', 'name email')  // ✅ Changed from 'uploadedBy' to 'userId'
       .sort({ uploadedAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .lean();
+
+// Map to frontend-friendly format
+const photosFormatted = photos.map(photo => ({
+  _id: photo._id,
+  filename: photo.filename,
+  url: photo.url || photo.path,  // ✅ Use url or path
+  path: photo.path,  // Keep path for reference
+  size: photo.size,
+  event: photo.eventId,
+  uploadedBy: photo.userId,
+  facesDetected: photo.faces?.length || 0,
+  faces: photo.faces || [],
+  uploadedAt: photo.uploadedAt,
+  processedAt: photo.processed ? photo.updatedAt : null
+}));
+
 
     const total = await Photo.countDocuments(query);
 
     // Get stats
     const stats = {
       total: await Photo.countDocuments(),
-      withFaces: await Photo.countDocuments({ facesDetected: { $gt: 0 } }),
-      withoutFaces: await Photo.countDocuments({ facesDetected: 0 }),
+      withFaces: await Photo.countDocuments({ 'faces.0': { $exists: true } }),
+      withoutFaces: await Photo.countDocuments({ 'faces.0': { $exists: false } }),
       totalSize: await Photo.aggregate([
         { $group: { _id: null, total: { $sum: '$size' } } }
       ]).then(result => result[0]?.total || 0)
@@ -969,7 +1006,7 @@ exports.getAllPhotos = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        photos,
+        photos: photosFormatted,
         pagination: {
           currentPage: Number(page),
           totalPages: Math.ceil(total / limit),
@@ -988,7 +1025,8 @@ exports.getAllPhotos = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching all photos', {
       service: 'photomanea-backend',
-      error: error.message
+      error: error.message,
+      stack: error.stack  // ✅ Added for debugging
     });
 
     res.status(500).json({
@@ -998,6 +1036,122 @@ exports.getAllPhotos = async (req, res) => {
     });
   }
 };
+
+/**
+ * Delete photo (admin) - FIXED FOR YOUR SCHEMA
+ */
+exports.deletePhoto = async (req, res) => {
+  try {
+    const { photoId } = req.params;
+
+    const photo = await Photo.findById(photoId);
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo not found'
+      });
+    }
+
+    // Delete physical file
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Use photo.path instead of photo.url
+    const filePath = path.join(__dirname, '..', photo.path);
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      logger.info('Physical file deleted', { filePath });
+    }
+
+    // Delete from database
+    await Photo.findByIdAndDelete(photoId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Photo deleted successfully'
+    });
+
+    logger.info('Photo deleted by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      photoId
+    });
+  } catch (error) {
+    logger.error('Error deleting photo', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete photo',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Bulk delete photos (admin) - FIXED FOR YOUR SCHEMA
+ */
+exports.bulkDeletePhotos = async (req, res) => {
+  try {
+    const { photoIds } = req.body;
+
+    if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide photo IDs to delete'
+      });
+    }
+
+    const photos = await Photo.find({ _id: { $in: photoIds } });
+
+    // Delete physical files
+    const fs = require('fs');
+    const path = require('path');
+    
+    let deletedFiles = 0;
+    for (const photo of photos) {
+      const filePath = path.join(__dirname, '..', photo.path);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        deletedFiles++;
+      }
+    }
+
+    // Delete from database
+    const result = await Photo.deleteMany({ _id: { $in: photoIds } });
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} photo(s) deleted successfully`,
+      data: {
+        deletedFromDB: result.deletedCount,
+        deletedFiles: deletedFiles
+      }
+    });
+
+    logger.info('Bulk photos deleted by admin', {
+      service: 'photomanea-backend',
+      adminId: req.user?._id,
+      count: result.deletedCount,
+      filesDeleted: deletedFiles
+    });
+  } catch (error) {
+    logger.error('Error bulk deleting photos', {
+      service: 'photomanea-backend',
+      error: error.message
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete photos',
+      error: error.message
+    });
+  }
+};
+
 
 /**
  * Delete photo (admin)
