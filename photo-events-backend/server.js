@@ -104,6 +104,13 @@ try {
   app.use('/api/admin', require('./routes/admin'));
   logger.info('  ✅ Admin routes loaded');
 
+  // Settings routes
+app.use('/api/settings', require('./routes/settings'));
+logger.info('  ✅ Settings routes loaded');
+
+
+
+
   logger.info('✅ All routes loaded successfully');
 } catch (error) {
   logger.error('❌ Failed to load routes:', error);

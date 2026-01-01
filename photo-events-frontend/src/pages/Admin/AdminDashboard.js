@@ -260,13 +260,7 @@ const AdminDashboard = () => {
             <span className="action-text">View All Events</span>
           </button>
 
-          <button 
-            onClick={() => navigate('/admin/photos')}
-            className="action-btn action-photos"
-          >
-            <span className="action-icon">📸</span>
-            <span className="action-text">Photo Manager</span>
-          </button>
+     
 
           <button 
             onClick={() => navigate('/admin/logs')}
