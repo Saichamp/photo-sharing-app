@@ -41,6 +41,8 @@ import ManageUsers from './pages/Admin/ManageUsers';
 import ManageEvents from './pages/Admin/ManageEvents';
 import ManagePhotos from './pages/Admin/ManagePhotos';
 import AnalyticsDashboard from './pages/Admin/AnalyticsDashboard';
+import SystemSettings from './pages/Admin/SystemSettings';
+
 
 
 // Protected Route Component
@@ -97,6 +99,8 @@ function AppRoutes() {
       <Route path="/admin/events" element={<ManageEvents />} />
       <Route path="/admin/photos" element={<ManagePhotos />} />
       <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
+      <Route path="/admin/settings" element={<SystemSettings />} />
+
         {/* ================================
             GUEST REGISTRATION ROUTES
             ================================ */}

@@ -9,8 +9,9 @@ const { logger } = require('../utils/logger');
 
 /**
  * Authenticate user via JWT token
+ * ALIAS: protect (for compatibility)
  */
-exports.authenticate = async (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
     // Get token from header
     const authHeader = req.headers.authorization;
@@ -81,7 +82,7 @@ exports.authenticate = async (req, res, next) => {
  * Require admin role middleware
  * Must be used AFTER authenticate middleware
  */
-exports.requireAdmin = (req, res, next) => {
+const requireAdmin = (req, res, next) => {
   // Check if user exists (should be set by authenticate middleware)
   if (!req.user) {
     return res.status(401).json({
@@ -110,9 +111,49 @@ exports.requireAdmin = (req, res, next) => {
 };
 
 /**
+ * Admin-only middleware (standalone version)
+ */
+const adminOnly = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    logger.warn('Admin access denied', {
+      service: 'photomanea-backend',
+      userId: req.user?._id,
+      role: req.user?.role
+    });
+
+    res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin privileges required.'
+    });
+  }
+};
+
+/**
+ * Organizer or Admin middleware
+ */
+const organizerOrAdmin = (req, res, next) => {
+  if (req.user && (req.user.role === 'organizer' || req.user.role === 'admin')) {
+    next();
+  } else {
+    logger.warn('Organizer access denied', {
+      service: 'photomanea-backend',
+      userId: req.user?._id,
+      role: req.user?.role
+    });
+
+    res.status(403).json({
+      success: false,
+      message: 'Access denied. Organizer or Admin privileges required.'
+    });
+  }
+};
+
+/**
  * Check quota middleware (for events, photos, etc.)
  */
-exports.checkQuota = (resourceType) => {
+const checkQuota = (resourceType) => {
   return async (req, res, next) => {
     try {
       const user = req.user;
@@ -161,7 +202,7 @@ exports.checkQuota = (resourceType) => {
 /**
  * Verify ownership middleware
  */
-exports.verifyOwnership = (Model, paramName = 'id') => {
+const verifyOwnership = (Model, paramName = 'id') => {
   return async (req, res, next) => {
     try {
       const resourceId = req.params[paramName];
@@ -197,4 +238,15 @@ exports.verifyOwnership = (Model, paramName = 'id') => {
       next(error);
     }
   };
+};
+
+// Export all middleware
+module.exports = {
+  authenticate,
+  protect: authenticate, // ALIAS for compatibility
+  requireAdmin,
+  adminOnly,
+  organizerOrAdmin,
+  checkQuota,
+  verifyOwnership
 };
