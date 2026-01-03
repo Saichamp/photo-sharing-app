@@ -1,6 +1,6 @@
 /* ================================================================
-   DASHBOARD PAGE - SIMPLE YET ATTRACTIVE
-   Fully Responsive • Clean Design • Professional
+   DASHBOARD PAGE - WITH MINI CHARTS & ACTIVITY FEED
+   No Quick Actions • Grid View • Recent Activity • Mini Charts
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -20,7 +20,17 @@
 
 /* ==================== HEADER ==================== */
 .dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
   margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.header-content {
+  flex: 1;
+  min-width: 250px;
 }
 
 .dashboard-header h1 {
@@ -53,18 +63,19 @@
   }
 }
 
-/* ==================== STAT CARD (CLEAN & SIMPLE) ==================== */
+/* ==================== STAT CARD WITH MINI CHART ==================== */
 .stat-card {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 24px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   transition: all 0.2s ease;
   cursor: default;
   position: relative;
+  overflow: hidden;
 }
 
 .stat-card:hover {
@@ -123,7 +134,7 @@
   margin-top: 4px;
 }
 
-.stat-info a {
+.stat-link {
   display: inline-block;
   margin-top: 8px;
   color: #7c3aed;
@@ -133,8 +144,40 @@
   transition: color 0.2s;
 }
 
-.stat-info a:hover {
+.stat-link:hover {
   color: #6d28d9;
+}
+
+/* ==================== MINI CHART ==================== */
+.stat-chart {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 60px;
+  height: 40px;
+  opacity: 0.3;
+}
+
+.mini-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+  gap: 3px;
+  padding: 0 8px 8px;
+}
+
+.chart-bar {
+  flex: 1;
+  background: linear-gradient(180deg, #7c3aed 0%, #6d28d9 100%);
+  border-radius: 2px 2px 0 0;
+  min-height: 4px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover .chart-bar {
+  opacity: 0.8;
+  transform: scaleY(1.1);
 }
 
 /* ==================== DASHBOARD CONTENT LAYOUT ==================== */
@@ -146,71 +189,8 @@
 
 @media (min-width: 1024px) {
   .dashboard-content {
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 1fr 320px;
     gap: 32px;
-  }
-}
-
-/* ==================== SIDEBAR NAVIGATION ==================== */
-.dashboard-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-@media (max-width: 1023px) {
-  .dashboard-sidebar {
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    gap: 8px;
-  }
-  
-  .dashboard-sidebar::-webkit-scrollbar {
-    height: 4px;
-  }
-  
-  .dashboard-sidebar::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 4px;
-  }
-  
-  .dashboard-sidebar::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
-  }
-}
-
-/* ==================== TAB LINKS ==================== */
-.tab-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  color: #64748b;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  background: transparent;
-}
-
-.tab-link:hover {
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.tab-link.active {
-  background: #0f172a;
-  color: white;
-}
-
-@media (max-width: 1023px) {
-  .tab-link {
-    padding: 10px 16px;
-    font-size: 13px;
   }
 }
 
@@ -218,6 +198,99 @@
 .dashboard-main {
   min-width: 0;
   width: 100%;
+}
+
+/* ==================== RECENT ACTIVITY SIDEBAR ==================== */
+.dashboard-sidebar {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-sidebar {
+    display: block;
+  }
+}
+
+.activity-section {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  position: sticky;
+  top: 90px;
+}
+
+.activity-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 20px 0;
+  letter-spacing: -0.01em;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.activity-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-text {
+  font-size: 13px;
+  color: #0f172a;
+  line-height: 1.5;
+  margin: 0 0 4px 0;
+}
+
+.activity-text strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.activity-time {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.activity-empty {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.activity-empty p {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0;
 }
 
 /* ==================== LOADING STATE ==================== */
@@ -285,6 +358,12 @@
   
   .dashboard-header {
     margin-bottom: 32px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .btn-primary {
+    width: 100%;
   }
   
   .dashboard-stats {
@@ -354,6 +433,15 @@
 .stat-card:nth-child(3) { animation-delay: 0.15s; }
 .stat-card:nth-child(4) { animation-delay: 0.2s; }
 
+.activity-item {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.activity-item:nth-child(1) { animation-delay: 0.1s; }
+.activity-item:nth-child(2) { animation-delay: 0.15s; }
+.activity-item:nth-child(3) { animation-delay: 0.2s; }
+.activity-item:nth-child(4) { animation-delay: 0.25s; }
+
 /* ==================== ACCESSIBILITY ==================== */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -365,8 +453,8 @@
   }
 }
 
-.tab-link:focus-visible,
-.btn:focus-visible {
+.btn:focus-visible,
+.stat-link:focus-visible {
   outline: 2px solid #7c3aed;
   outline-offset: 2px;
 }
@@ -374,7 +462,8 @@
 /* ==================== PRINT STYLES ==================== */
 @media print {
   .dashboard-sidebar,
-  .btn {
+  .btn,
+  .activity-section {
     display: none;
   }
   
