@@ -26,7 +26,7 @@ import GuestGallery from './pages/Guest/GuestGallery';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 
 // Components
-import { Navbar } from './components/common/Navbar';
+import Navbar from "./components/common/Navbar";
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 
 import './App.css';
