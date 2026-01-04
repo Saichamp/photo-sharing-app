@@ -1,9 +1,55 @@
 /* ================================================================
-   DASHBOARD PAGE - WITH MINI CHARTS & ACTIVITY FEED
-   No Quick Actions • Grid View • Recent Activity • Mini Charts
+   DASHBOARD PAGE - PURPLE + GOLD LUXURY THEME
+   Matching Landing Page Colors • Mini Charts • Activity Feed
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* 🟣 Primary Purple (from Landing Page) */
+  --primary-50: #faf5ff;
+  --primary-100: #f3e8ff;
+  --primary-200: #e9d5ff;
+  --primary-300: #d8b4fe;
+  --primary-400: #c084fc;
+  --primary-500: #a855f7;
+  --primary-600: #7c3aed;
+  --primary-700: #6b21a8;
+  --primary-800: #581c87;
+  --primary-900: #4c1d95;
+
+  /* 🟡 Accent Gold */
+  --accent-50: #fffbeb;
+  --accent-100: #fef3c7;
+  --accent-200: #fde68a;
+  --accent-300: #fcd34d;
+  --accent-400: #fbbf24;
+  --accent-500: #f59e0b;
+  --accent-600: #d97706;
+
+  /* ⚫ Neutrals */
+  --neutral-50: #fafaf9;
+  --neutral-100: #f5f5f4;
+  --neutral-200: #e7e5e4;
+  --neutral-300: #d6d3d1;
+  --neutral-400: #a8a29e;
+  --neutral-500: #78716c;
+  --neutral-600: #57534e;
+  --neutral-700: #44403c;
+  --neutral-800: #292524;
+  --neutral-900: #1c1917;
+
+  /* ✨ Gradients */
+  --gradient-primary: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  --gradient-accent: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  --gradient-purple-gold: linear-gradient(135deg, #7c3aed 0%, #6b21a8 50%, #f59e0b 100%);
+
+  /* 📊 Shadows */
+  --shadow-sm: 0 1px 2px rgba(124, 58, 237, 0.05);
+  --shadow-md: 0 4px 6px rgba(124, 58, 237, 0.07);
+  --shadow-lg: 0 10px 15px rgba(124, 58, 237, 0.1);
+  --shadow-xl: 0 20px 25px rgba(124, 58, 237, 0.15);
+}
 
 * {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -15,7 +61,7 @@
   margin: 0 auto;
   padding: 100px clamp(20px, 4vw, 40px) 60px;
   min-height: 100vh;
-  background: #fafafa;
+  background: linear-gradient(135deg, var(--neutral-50) 0%, var(--primary-50) 100%);
 }
 
 /* ==================== HEADER ==================== */
@@ -34,16 +80,20 @@
 }
 
 .dashboard-header h1 {
-  font-size: clamp(26px, 4vw, 32px);
+  font-size: clamp(26px, 4vw, 36px);
   font-weight: 800;
-  color: #0f172a;
+  color: var(--neutral-900);
   margin: 0 0 8px 0;
   letter-spacing: -0.02em;
+  background: var(--gradient-purple-gold);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .dashboard-header p {
   font-size: clamp(14px, 2vw, 16px);
-  color: #64748b;
+  color: var(--neutral-600);
   margin: 0;
   font-weight: 400;
 }
@@ -63,43 +113,66 @@
   }
 }
 
-/* ==================== STAT CARD WITH MINI CHART ==================== */
+/* ==================== STAT CARD WITH PURPLE THEME ==================== */
 .stat-card {
   background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid var(--primary-100);
+  border-radius: 16px;
   padding: 24px;
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   cursor: default;
   position: relative;
   overflow: hidden;
 }
 
-.stat-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  transform: translateY(-2px);
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
-/* ==================== STAT ICON ==================== */
+.stat-card:hover {
+  border-color: var(--primary-300);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+/* ==================== STAT ICON WITH GRADIENT ==================== */
 .stat-icon {
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8fafc;
-  border-radius: 10px;
-  font-size: 24px;
+  background: var(--gradient-primary);
+  border-radius: 12px;
+  font-size: 26px;
   flex-shrink: 0;
+  box-shadow: var(--shadow-md);
 }
 
 .stat-card:hover .stat-icon {
-  background: #f1f5f9;
+  transform: scale(1.05);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Gold accent for last card */
+.stat-card:last-child .stat-icon {
+  background: var(--gradient-accent);
 }
 
 /* ==================== STAT INFO ==================== */
@@ -109,53 +182,72 @@
 }
 
 .stat-info h3 {
-  font-size: clamp(28px, 4vw, 32px);
+  font-size: clamp(28px, 4vw, 36px);
   font-weight: 800;
-  color: #0f172a;
+  color: var(--neutral-900);
   line-height: 1;
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
   letter-spacing: -0.02em;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-card:last-child .stat-info h3 {
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .stat-info p {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 600;
+  font-size: 11px;
+  color: var(--neutral-500);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0 0 10px 0;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px 0;
 }
 
 .stat-detail {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--neutral-400);
   font-weight: 500;
   display: block;
   margin-top: 4px;
 }
 
 .stat-link {
-  display: inline-block;
-  margin-top: 8px;
-  color: #7c3aed;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--primary-600);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
-  transition: color 0.2s;
+  transition: all 0.2s;
 }
 
 .stat-link:hover {
-  color: #6d28d9;
+  color: var(--primary-700);
+  gap: 8px;
 }
 
-/* ==================== MINI CHART ==================== */
+.stat-link::after {
+  content: '→';
+  font-size: 16px;
+}
+
+/* ==================== MINI CHART (PURPLE GRADIENT) ==================== */
 .stat-chart {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 60px;
-  height: 40px;
-  opacity: 0.3;
+  width: 80px;
+  height: 50px;
+  opacity: 0.15;
 }
 
 .mini-chart {
@@ -163,21 +255,25 @@
   align-items: flex-end;
   justify-content: space-between;
   height: 100%;
-  gap: 3px;
-  padding: 0 8px 8px;
+  gap: 4px;
+  padding: 0 12px 12px;
 }
 
 .chart-bar {
   flex: 1;
-  background: linear-gradient(180deg, #7c3aed 0%, #6d28d9 100%);
-  border-radius: 2px 2px 0 0;
-  min-height: 4px;
-  transition: all 0.3s ease;
+  background: var(--gradient-primary);
+  border-radius: 3px 3px 0 0;
+  min-height: 6px;
+  transition: all 0.4s ease;
+}
+
+.stat-card:last-child .chart-bar {
+  background: var(--gradient-accent);
 }
 
 .stat-card:hover .chart-bar {
-  opacity: 0.8;
-  transform: scaleY(1.1);
+  opacity: 0.3;
+  transform: scaleY(1.15);
 }
 
 /* ==================== DASHBOARD CONTENT LAYOUT ==================== */
@@ -200,7 +296,7 @@
   width: 100%;
 }
 
-/* ==================== RECENT ACTIVITY SIDEBAR ==================== */
+/* ==================== RECENT ACTIVITY SIDEBAR (PURPLE THEME) ==================== */
 .dashboard-sidebar {
   display: none;
 }
@@ -213,19 +309,24 @@
 
 .activity-section {
   background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid var(--primary-100);
+  border-radius: 16px;
   padding: 24px;
   position: sticky;
   top: 90px;
+  box-shadow: var(--shadow-sm);
 }
 
 .activity-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--neutral-900);
   margin: 0 0 20px 0;
   letter-spacing: -0.01em;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .activity-list {
@@ -238,7 +339,8 @@
   display: flex;
   gap: 12px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--primary-50);
+  transition: all 0.2s ease;
 }
 
 .activity-item:last-child {
@@ -246,17 +348,22 @@
   padding-bottom: 0;
 }
 
+.activity-item:hover {
+  padding-left: 4px;
+}
+
 .activity-icon {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8fafc;
-  border-radius: 8px;
+  background: var(--gradient-primary);
+  border-radius: 10px;
   font-size: 18px;
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .activity-content {
@@ -266,19 +373,19 @@
 
 .activity-text {
   font-size: 13px;
-  color: #0f172a;
+  color: var(--neutral-700);
   line-height: 1.5;
   margin: 0 0 4px 0;
 }
 
 .activity-text strong {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-700);
 }
 
 .activity-time {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--neutral-400);
   font-weight: 500;
 }
 
@@ -289,7 +396,7 @@
 
 .activity-empty p {
   font-size: 14px;
-  color: #94a3b8;
+  color: var(--neutral-400);
   margin: 0;
 }
 
@@ -305,21 +412,21 @@
 }
 
 .dashboard-loading p {
-  color: #64748b;
+  color: var(--primary-600);
   font-weight: 600;
   font-size: 15px;
   margin-top: 16px;
 }
 
-/* ==================== BUTTONS ==================== */
+/* ==================== BUTTONS (PURPLE THEME) ==================== */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 700;
   font-size: 14px;
   text-decoration: none;
   border: none;
@@ -329,25 +436,25 @@
 }
 
 .btn-primary {
-  background: #0f172a;
+  background: var(--gradient-primary);
   color: white;
+  box-shadow: var(--shadow-md);
 }
 
 .btn-primary:hover {
-  background: #1e293b;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 .btn-secondary {
   background: white;
-  color: #0f172a;
-  border: 1px solid #e2e8f0;
+  color: var(--primary-700);
+  border: 1px solid var(--primary-200);
 }
 
 .btn-secondary:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
+  border-color: var(--primary-400);
+  background: var(--primary-50);
 }
 
 /* ==================== RESPONSIVE MOBILE ==================== */
@@ -375,10 +482,10 @@
   }
   
   .stat-icon {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    font-size: 22px;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    font-size: 24px;
   }
   
   .stat-info h3 {
@@ -397,10 +504,10 @@
   }
   
   .stat-icon {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    font-size: 20px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 22px;
   }
   
   .stat-info h3 {
@@ -408,7 +515,7 @@
   }
   
   .stat-info p {
-    font-size: 11px;
+    font-size: 10px;
   }
 }
 
@@ -424,23 +531,35 @@
   }
 }
 
-.stat-card {
-  animation: fadeIn 0.3s ease-out;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-.stat-card:nth-child(1) { animation-delay: 0.05s; }
-.stat-card:nth-child(2) { animation-delay: 0.1s; }
-.stat-card:nth-child(3) { animation-delay: 0.15s; }
-.stat-card:nth-child(4) { animation-delay: 0.2s; }
+.stat-card {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+.stat-card:nth-child(4) { animation-delay: 0.4s; }
 
 .activity-item {
-  animation: fadeIn 0.3s ease-out;
+  animation: slideIn 0.3s ease-out;
 }
 
 .activity-item:nth-child(1) { animation-delay: 0.1s; }
 .activity-item:nth-child(2) { animation-delay: 0.15s; }
 .activity-item:nth-child(3) { animation-delay: 0.2s; }
 .activity-item:nth-child(4) { animation-delay: 0.25s; }
+.activity-item:nth-child(5) { animation-delay: 0.3s; }
 
 /* ==================== ACCESSIBILITY ==================== */
 @media (prefers-reduced-motion: reduce) {
@@ -455,7 +574,7 @@
 
 .btn:focus-visible,
 .stat-link:focus-visible {
-  outline: 2px solid #7c3aed;
+  outline: 2px solid var(--primary-600);
   outline-offset: 2px;
 }
 
