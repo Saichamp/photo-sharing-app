@@ -13,10 +13,20 @@ const { logger } = require('../utils/logger');
  */
 const authenticate = async (req, res, next) => {
   try {
+    // ✅ DEBUG: Log incoming request
+    console.log('🔐 Auth Middleware Check:', {
+      url: req.url,
+      method: req.method,
+      hasAuthHeader: !!req.headers.authorization,
+      authPreview: req.headers.authorization ? req.headers.authorization.substring(0, 30) + '...' : 'NONE',
+      timestamp: new Date().toISOString()
+    });
+
     // Get token from header
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Auth failed: No token provided');
       return res.status(401).json({
         success: false,
         message: 'Authentication required. No token provided.'
@@ -25,14 +35,30 @@ const authenticate = async (req, res, next) => {
 
     // Extract token
     const token = authHeader.split(' ')[1];
+    
+    if (!token || token === 'null' || token === 'undefined') {
+      console.log('❌ Auth failed: Invalid token format');
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Invalid token format.'
+      });
+    }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('✅ Token verified successfully for user:', decoded.id);
+    } catch (jwtError) {
+      console.log('❌ JWT verification failed:', jwtError.message);
+      throw jwtError;
+    }
 
     // Get user from database
     const user = await User.findById(decoded.id).select('-password');
     
     if (!user) {
+      console.log('❌ User not found for ID:', decoded.id);
       return res.status(401).json({
         success: false,
         message: 'User not found. Token invalid.'
@@ -41,22 +67,28 @@ const authenticate = async (req, res, next) => {
 
     // Check if user is active
     if (!user.isActive) {
+      console.log('❌ User account deactivated:', user._id);
       return res.status(403).json({
         success: false,
         message: 'Account has been deactivated. Please contact support.'
       });
     }
 
-    // Attach user to request object
+    // ✅ Attach user to request object
     req.user = user;
+    console.log('✅ Auth successful - User:', user.email, '| ID:', user._id);
+    
     next();
+
   } catch (error) {
     logger.error('Authentication error', {
       service: 'photomanea-backend',
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
 
     if (error.name === 'JsonWebTokenError') {
+      console.log('❌ Invalid JWT token');
       return res.status(401).json({
         success: false,
         message: 'Invalid token'
@@ -64,12 +96,14 @@ const authenticate = async (req, res, next) => {
     }
 
     if (error.name === 'TokenExpiredError') {
+      console.log('❌ Token expired');
       return res.status(401).json({
         success: false,
         message: 'Token expired. Please login again.'
       });
     }
 
+    console.log('❌ Authentication error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Authentication failed',
@@ -85,6 +119,7 @@ const authenticate = async (req, res, next) => {
 const requireAdmin = (req, res, next) => {
   // Check if user exists (should be set by authenticate middleware)
   if (!req.user) {
+    console.log('❌ Admin check: No user in request');
     return res.status(401).json({
       success: false,
       message: 'Authentication required'
@@ -93,13 +128,19 @@ const requireAdmin = (req, res, next) => {
 
   // Check if user is admin
   if (req.user.role !== 'admin') {
+    console.log('⚠️ Admin check failed:', {
+      userId: req.user._id,
+      userRole: req.user.role,
+      path: req.path
+    });
+    
     logger.warn('Unauthorized admin access attempt', {
       service: 'photomanea-backend',
       userId: req.user._id,
       userRole: req.user.role,
       path: req.path
     });
-
+    
     return res.status(403).json({
       success: false,
       message: 'Access denied. Admin privileges required.'
@@ -107,6 +148,7 @@ const requireAdmin = (req, res, next) => {
   }
 
   // User is admin, proceed
+  console.log('✅ Admin access granted:', req.user.email);
   next();
 };
 
@@ -122,7 +164,7 @@ const adminOnly = (req, res, next) => {
       userId: req.user?._id,
       role: req.user?.role
     });
-
+    
     res.status(403).json({
       success: false,
       message: 'Access denied. Admin privileges required.'
@@ -142,7 +184,7 @@ const organizerOrAdmin = (req, res, next) => {
       userId: req.user?._id,
       role: req.user?.role
     });
-
+    
     res.status(403).json({
       success: false,
       message: 'Access denied. Organizer or Admin privileges required.'
@@ -168,7 +210,6 @@ const checkQuota = (resourceType) => {
       };
 
       const userLimit = limits[plan]?.[resourceType];
-      
       if (!userLimit) {
         return next();
       }
@@ -209,7 +250,6 @@ const verifyOwnership = (Model, paramName = 'id') => {
       const userId = req.user._id;
 
       const resource = await Model.findById(resourceId);
-
       if (!resource) {
         return res.status(404).json({
           success: false,
@@ -219,7 +259,6 @@ const verifyOwnership = (Model, paramName = 'id') => {
 
       // Check ownership
       const ownerId = resource.organizer || resource.userId || resource.user;
-      
       if (ownerId.toString() !== userId.toString()) {
         return res.status(403).json({
           success: false,

@@ -27,6 +27,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 
 // Components
 import Navbar from "./components/common/Navbar";
+import PhotoPreview from './components/organizer/PhotoPreview';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 
 import './App.css';
@@ -100,6 +101,7 @@ function AppRoutes() {
       <Route path="/admin/photos" element={<ManagePhotos />} />
       <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
       <Route path="/admin/settings" element={<SystemSettings />} />
+      <Route path="/events/:eventId/photos" element={<PhotoPreview />} />
 
         {/* ================================
             GUEST REGISTRATION ROUTES
