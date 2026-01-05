@@ -1,100 +1,64 @@
-/**
- * Photo Routes for PhotoManEa
- * Handles photo uploads and management
- */
-
 const express = require('express');
 const router = express.Router();
+
 const photoController = require('../controllers/photoController');
 const { authenticate } = require('../middleware/authenticate');
-const { uploadPhotos, handleMulterError } = require('../middleware/upload'); // ✅ FIXED: Destructured import
+const { uploadPhotos, handleMulterError } = require('../middleware/upload');
 
 /**
- * @route   POST /api/photos/upload
- * @desc    Upload photos to an event (bulk upload)
- * @access  Private (requires authentication)
+ * Photo Upload Routes
  */
+
+// Upload photos to event
 router.post(
   '/upload',
   authenticate,
-  uploadPhotos.array('photos', 100), // ✅ FIXED: Use uploadPhotos for multiple files
-  handleMulterError, // ✅ ADDED: Handle multer errors
+  uploadPhotos.array('photos'),
+  handleMulterError,
   photoController.uploadPhotos
 );
 
 /**
- * @route   GET /api/photos/event/:eventId
- * @desc    Get all photos for an event
- * @access  Private or Public with registration
+ * Photo Retrieval Routes
  */
-router.get(
-  '/event/:eventId',
-  photoController.getEventPhotos
-);
+
+// Get all photos for event (no pagination - for preview page)
+router.get('/event/:eventId/all', authenticate, photoController.getAllEventPhotos);
+
+// Get photos for event (paginated - for public gallery)
+router.get('/event/:eventId', photoController.getEventPhotos);
+
+// Get photo statistics for event
+router.get('/event/:eventId/stats', authenticate, photoController.getPhotoStats);
+
+// Get single photo by ID
+router.get('/:id', photoController.getPhotoById);
 
 /**
- * @route   GET /api/photos/event/:eventId/stats
- * @desc    Get photo statistics for an event
- * @access  Private (requires authentication)
+ * Photo Processing Routes
  */
-router.get(
-  '/event/:eventId/stats',
-  authenticate,
-  photoController.getPhotoStats
-);
+
+// Manually trigger face processing for a photo
+router.post('/process/:photoId', authenticate, photoController.processPhotoFaces);
+
+// Trigger batch matching for all photos in event
+router.post('/event/:eventId/batch-match', authenticate, photoController.triggerBatchMatching);
 
 /**
- * @route   GET /api/photos/matches/:registrationId
- * @desc    Get photos matched to a specific registration (guest gallery)
- * @access  Public
+ * Photo Matching Routes (for guests)
  */
-router.get(
-  '/matches/:registrationId',
-  photoController.getMatchedPhotos
-);
 
-/**
- * @route   GET /api/photos/:id
- * @desc    Get single photo by ID
- * @access  Private or Public
- */
-router.get(
-  '/:id',
-  photoController.getPhotoById
-);
+// Get matched photos for a guest registration
+router.get('/matches/:registrationId', photoController.getMatchedPhotos);
 
-/**
- * @route   DELETE /api/photos/:id
- * @desc    Delete a photo
- * @access  Private (requires authentication)
- */
-router.delete(
-  '/:id',
-  authenticate,
-  photoController.deletePhoto
-);
-
-/**
- * @route   POST /api/photos/process/:photoId
- * @desc    Manually trigger face processing for a photo
- * @access  Private (requires authentication)
- */
-router.post(
-  '/process/:photoId',
-  authenticate,
-  photoController.processPhotoFaces
-);
-
-/**
- * @route   POST /api/photos/batch-match/:eventId
- * @desc    Trigger batch face matching for all photos in an event
- * @access  Private (requires authentication)
- */
-router.post(
-  '/batch-match/:eventId',
-  authenticate,
-  photoController.triggerBatchMatching
-);
+// Find matches using face recognition (alternative endpoint)
 router.post('/find-matches', photoController.findGuestPhotos);
+
+/**
+ * Photo Management Routes
+ */
+
+// Delete a photo
+router.delete('/:id', authenticate, photoController.deletePhoto);
 
 module.exports = router;
