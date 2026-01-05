@@ -2,118 +2,252 @@
  * File Upload Middleware using Multer
  * Handles photo uploads with validation
  * Separate configurations for selfies and event photos
+ * 
+ * EVENT PHOTOS: UNLIMITED size & count
+ * SELFIES: 10MB limit (single file)
  */
 
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const config = require('../config/config');
 const { AppError } = require('./errorHandler');
 
-// Ensure upload directories exist
-const fs = require('fs');
-const uploadDir = config.upload.uploadDir || './uploads';
-const photosDir = path.join(uploadDir, 'photos');
-const selfiesDir = path.join(uploadDir, 'selfies'); // ✅ NEW: Separate folder for selfies
+// ========================================
+// DIRECTORY SETUP
+// ========================================
 
+const uploadDir = config.upload?.uploadDir || './uploads';
+const photosDir = path.join(uploadDir, 'photos');
+const selfiesDir = path.join(uploadDir, 'selfies');
+
+// Create directories if they don't exist
 [uploadDir, photosDir, selfiesDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
+    console.log(`✅ Created directory: ${dir}`);
   }
 });
 
+// ========================================
+// STORAGE CONFIGURATIONS
+// ========================================
+
 /**
- * ✅ Storage Configuration for EVENT PHOTOS
+ * Storage for EVENT PHOTOS
+ * Stores in: uploads/photos/
  */
 const photoStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, photosDir); // Event photos → uploads/photos
+    cb(null, photosDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    cb(null, `photo-${uniqueSuffix}${ext}`); // ✅ Prefix: photo-
+    const ext = path.extname(file.originalname).toLowerCase();
+    const sanitizedName = path.basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9]/g, '-')
+      .substring(0, 50);
+    cb(null, `photo-${uniqueSuffix}-${sanitizedName}${ext}`);
   }
 });
 
 /**
- * ✅ Storage Configuration for SELFIES (Guest Registration)
+ * Storage for SELFIES (Guest Registration)
+ * Stores in: uploads/selfies/
  */
 const selfieStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, selfiesDir); // Selfies → uploads/selfies
+    cb(null, selfiesDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `selfie-${uniqueSuffix}${ext}`); // ✅ Prefix: selfie-
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `selfie-${uniqueSuffix}${ext}`);
   }
 });
+
+// ========================================
+// FILE VALIDATION
+// ========================================
+
+/**
+ * Allowed image types
+ */
+const ALLOWED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'image/bmp',
+  'image/tiff'
+];
 
 /**
  * File Filter - Only allow images
  */
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = config.upload.allowedTypes || [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp'
-  ];
-
-  if (allowedTypes.includes(file.mimetype)) {
+  const allowedTypes = config.upload?.allowedTypes || ALLOWED_IMAGE_TYPES;
+  
+  // Check MIME type
+  if (allowedTypes.includes(file.mimetype.toLowerCase())) {
     cb(null, true);
   } else {
-    cb(new AppError('Invalid file type. Only JPEG, PNG, and WebP images are allowed.', 400), false);
+    // Check file extension as fallback
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif', '.bmp', '.tiff'];
+    
+    if (allowedExts.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new AppError(`Invalid file type: ${file.mimetype}. Only images are allowed.`, 400), false);
+    }
   }
 };
 
+// ========================================
+// MULTER CONFIGURATIONS
+// ========================================
+
 /**
- * ✅ Multer Upload Instance for EVENT PHOTOS (bulk upload)
+ * 🔥 EVENT PHOTOS UPLOAD - UNLIMITED
+ * - NO file size limit
+ * - NO file count limit
+ * - Use for bulk photo uploads
  */
 const uploadPhotos = multer({
   storage: photoStorage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: config.upload.maxFileSize || 10485760, // 10MB
-    files: config.upload.maxFiles || 100
+    fileSize: Infinity,        // ✅ NO SIZE LIMIT
+    files: Infinity,           // ✅ NO FILE COUNT LIMIT
+    fields: 10,                // Max form fields
+    fieldSize: 10 * 1024 * 1024, // 10MB per field value
+    parts: Infinity            // ✅ NO PARTS LIMIT
   }
 });
 
 /**
- * ✅ Multer Upload Instance for SELFIES (single file)
+ * SELFIE UPLOAD - Limited (for guest registration)
+ * - 10MB max per selfie
+ * - Single file only
  */
 const uploadSelfie = multer({
   storage: selfieStorage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5242880, // 5MB for selfies
-    files: 1 // Only 1 selfie per registration
+    fileSize: 10 * 1024 * 1024, // 10MB max for selfies
+    files: 1                     // Single file only
   }
 });
 
+// ========================================
+// ERROR HANDLER
+// ========================================
+
 /**
- * Error Handler for Multer
+ * Multer Error Handler Middleware
+ * Converts Multer errors to friendly messages
  */
 const handleMulterError = (err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return next(new AppError('File size too large. Maximum size is 10MB.', 413));
-    }
-    if (err.code === 'LIMIT_FILE_COUNT') {
-      return next(new AppError('Too many files. Maximum is 100 files per upload.', 400));
-    }
-    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-      return next(new AppError('Unexpected field in file upload.', 400));
-    }
-    return next(new AppError(`Upload error: ${err.message}`, 400));
+  // Log error for debugging
+  if (err) {
+    console.error('🔴 Multer Error:', {
+      code: err.code,
+      message: err.message,
+      field: err.field
+    });
   }
-  next(err);
+
+  // Handle Multer-specific errors
+  if (err instanceof multer.MulterError) {
+    switch (err.code) {
+      case 'LIMIT_FILE_SIZE':
+        return next(new AppError(
+          `File too large. Maximum size: ${formatBytes(err.limit || 10485760)}`,
+          413
+        ));
+
+      case 'LIMIT_FILE_COUNT':
+        return next(new AppError(
+          `Too many files. Maximum: ${err.limit} files`,
+          400
+        ));
+
+      case 'LIMIT_FIELD_KEY':
+        return next(new AppError('Field name too long', 400));
+
+      case 'LIMIT_FIELD_VALUE':
+        return next(new AppError('Field value too long', 400));
+
+      case 'LIMIT_FIELD_COUNT':
+        return next(new AppError('Too many fields', 400));
+
+      case 'LIMIT_UNEXPECTED_FILE':
+        return next(new AppError(
+          `Unexpected field: "${err.field}". Expected field name: "photos" or "selfie"`,
+          400
+        ));
+
+      case 'LIMIT_PART_COUNT':
+        return next(new AppError('Too many parts in multipart form', 400));
+
+      default:
+        return next(new AppError(`Upload error: ${err.message}`, 400));
+    }
+  }
+
+  // Handle other errors (like invalid file type from fileFilter)
+  if (err instanceof AppError) {
+    return next(err);
+  }
+
+  // Pass other errors to global error handler
+  if (err) {
+    return next(err);
+  }
+
+  next();
 };
 
-// ✅ Export both upload configurations
+// ========================================
+// HELPER FUNCTIONS
+// ========================================
+
+/**
+ * Format bytes to human-readable format
+ */
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// ========================================
+// EXPORTS
+// ========================================
+
 module.exports = {
-  uploadPhotos,   // For bulk event photo uploads
-  uploadSelfie,   // For guest registration selfies
-  handleMulterError
+  // Main upload instances
+  uploadPhotos,      // For event photos (unlimited)
+  uploadSelfie,      // For selfies (10MB limit)
+  
+  // Middleware for specific routes
+  uploadPhotosMiddleware: uploadPhotos.array('photos'),  // ✅ Use this for /photos/upload
+  uploadSelfieMiddleware: uploadSelfie.single('selfie'), // ✅ Use this for /registrations
+  
+  // Error handler
+  handleMulterError,
+  
+  // Utility
+  formatBytes,
+  
+  // Constants (for reference)
+  ALLOWED_IMAGE_TYPES,
+  photosDir,
+  selfiesDir
 };
