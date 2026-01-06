@@ -13,6 +13,7 @@ const PhotoPreview = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // ✅ WRAP loadData in useCallback
+  // ✅ WRAP loadData in useCallback
   const loadData = useCallback(async () => {
     try {
       const [eventRes, photosRes] = await Promise.all([
@@ -40,18 +41,30 @@ const PhotoPreview = () => {
     } finally {
       setLoading(false);
     }
-  }, [eventId]); // ✅ Add eventId as dependency
+  }, [eventId]);
 
+  // ✅ Initial load
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // ✅ FIXED: Only poll when processing
+  useEffect(() => {
+    if (!isProcessing) {
+      return; // Don't create interval if not processing
+    }
+
+    console.log('🔄 Starting polling - Processing:', stats.processing, 'photos');
     
-    // Auto-refresh every 3 seconds while processing
     const interval = setInterval(() => {
       loadData();
     }, 3000);
     
-    return () => clearInterval(interval);
-  }, [loadData]); // ✅ Add loadData as dependency
+    return () => {
+      console.log('🛑 Stopping polling');
+      clearInterval(interval);
+    };
+  }, [isProcessing, loadData, stats.processing]); // ✅ Stops when isProcessing becomes false
 
   const retryFailedPhotos = async () => {
     const failedPhotos = photos.filter(p => p.processed && p.processingError);

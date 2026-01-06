@@ -1,3 +1,4 @@
+
 /**
  * Photo Controller for PhotoManEa
  * Handles photo upload and management with access control
@@ -17,8 +18,67 @@ const faceRecognitionService = require('../services/faceRecognition/faceRecognit
 const { isValidObjectId } = require('../utils/validators');
 
 /**
+ * ✅ PROCESSING QUEUE - Prevents CPU overload
+ * Processes 2 photos at a time with cooling delay
+ */
+const processingQueue = [];
+let activeProcessing = 0;
+const MAX_CONCURRENT = 2; // Process 2 photos simultaneously
+
+async function addToProcessingQueue(photo, eventId) {
+  processingQueue.push({ photo, eventId });
+  processNextInQueue();
+}
+
+async function processNextInQueue() {
+  if (activeProcessing >= MAX_CONCURRENT || processingQueue.length === 0) {
+    return;
+  }
+
+  activeProcessing++;
+  const { photo, eventId } = processingQueue.shift();
+
+  try {
+    console.log(`🤖 Processing ${photo.filename} (${processingQueue.length} remaining, ${activeProcessing} active)`);
+
+    const result = await faceRecognitionService.extractFaces(photo.path);
+
+    if (result.success && result.faces && result.faces.length > 0) {
+      const normalizedFaces = normalizeFaces(result.faces);
+      photo.faces = normalizedFaces;
+      photo.processed = true;
+      photo.processingError = null;
+      await photo.save();
+      
+      console.log(`✅ Found ${result.faces.length} faces in ${photo.filename}`);
+      
+      await matchPhotoWithRegistrations(photo, eventId);
+    } else {
+      photo.processed = true;
+      photo.processingError = 'No faces detected';
+      await photo.save();
+      console.log(`⚠️ No faces in ${photo.filename}`);
+    }
+
+    // ✅ 1 second cooling delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+  } catch (error) {
+    logger.error('Face processing failed', {
+      photoId: photo._id,
+      error: error.message,
+    });
+    photo.processed = true;
+    photo.processingError = error.message;
+    await photo.save();
+  } finally {
+    activeProcessing--;
+    processNextInQueue();
+  }
+}
+
+/**
  * Helper: normalize faces to match Photo FaceSchema
- * Ensures faceIndex exists and gender is 'M' or 'F'
  */
 function normalizeFaces(faces) {
   if (!Array.isArray(faces)) return [];
@@ -48,7 +108,7 @@ function normalizeFaces(faces) {
 exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   const { eventId } = req.body;
 
-  // ✅ 1. Check Authentication FIRST
+  // 1. Check Authentication
   if (!req.user || !req.user._id) {
     console.log('❌ Upload failed: req.user is undefined');
     throw new AppError('Authentication required. Please log in.', 401);
@@ -67,7 +127,7 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
 
-  // 4. Check Permission - FIXED
+  // 4. Check Permission
   const eventOwnerId = event.userId || event.createdBy || event.organizer;
 
   if (!eventOwnerId) {
@@ -86,10 +146,9 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   const errors = [];
   let totalUploadedSize = 0;
 
-  // 5. Process Files Safely
+  // 5. Process Files
   for (const file of req.files) {
     try {
-      // Windows-safe URL
       const relativePath = file.path.replace(/\\/g, '/').replace(/^uploads[\\/]/, '');
       const url = `${req.protocol}://${req.get('host')}/uploads/${relativePath}`;
 
@@ -112,52 +171,12 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
 
       console.log('✅ Photo saved:', file.filename, '| Size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
 
-      // Background Processing
-      setImmediate(async () => {
-        try {
-          const result = await faceRecognitionService.extractFaces(photo.path);
+      // ✅ Add to processing queue (controlled processing)
+      addToProcessingQueue(photo, eventId);
 
-          if (result.success && result.faces && result.faces.length > 0) {
-            const normalizedFaces = normalizeFaces(result.faces);
-            photo.faces = normalizedFaces;
-            photo.processed = true;
-            photo.processingError = null;
-
-            try {
-              await photo.save();
-              console.log('✅ Face processing completed for:', photo.filename);
-            } catch (err) {
-              logger.error('Background processing failed', {
-                photoId: photo._id,
-                error: err.message,
-              });
-              photo.processed = true;
-              photo.processingError = err.message;
-              await photo.save().catch(() => {});
-              return;
-            }
-
-            await matchPhotoWithRegistrations(photo, eventId);
-          } else {
-            photo.processed = true;
-            photo.processingError = 'No faces detected';
-            await photo.save().catch(() => {});
-          }
-        } catch (error) {
-          logger.error('Background processing failed', {
-            photoId: photo._id,
-            error: error.message,
-          });
-          photo.processed = true;
-          photo.processingError = error.message;
-          await photo.save().catch(() => {});
-        }
-      });
     } catch (err) {
       console.error(`❌ Failed to save photo ${file.originalname}:`, err);
       errors.push({ file: file.originalname, error: err.message });
-
-      // Cleanup orphaned file
       await fs.unlink(file.path).catch(() => {});
     }
   }
@@ -186,12 +205,13 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
       uploaded: createdPhotos.length,
       failed: errors.length,
       errors,
+      queueSize: processingQueue.length + activeProcessing,
+      estimatedTime: `${Math.ceil((processingQueue.length + activeProcessing) * 3 / 60)} minutes`
     },
-    'Photos uploaded successfully',
+    'Photos uploaded successfully. Processing started.',
     201
   );
 });
-
 /**
  * @desc Get all photos for an event (with pagination)
  * @route GET /api/photos/event/:eventId
