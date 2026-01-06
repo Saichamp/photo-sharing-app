@@ -1,86 +1,135 @@
 /**
- * Node.js Wrapper for Python Face Recognition Service (buffalo_l)
+ * Node.js Wrapper for Python Face Recognition Service
+ * Uses PERSISTENT Python process with model caching
  */
+
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs-extra');
 const { logger } = require('../../utils/logger');
 
 const PYTHON_SCRIPT = path.join(__dirname, 'face_service.py');
+const PYTHON_TIMEOUT = 120000; // 120 seconds for first load
 
-function runPythonCommand(command, args) {
-  return new Promise((resolve, reject) => {
-    const python = spawn('python', [PYTHON_SCRIPT, command, ...args]);
+// ✅ PERSISTENT Python process
+let pythonProcess = null;
+let pythonReady = false;
+let pendingRequests = new Map();
+let requestId = 0;
 
-    let stdout = '';
-    let stderr = '';
+/**
+ * Start persistent Python process
+ */
+function startPythonProcess() {
+  if (pythonProcess) {
+    return pythonProcess;
+  }
 
-    python.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
+  logger.info('Starting persistent Python process');
+  
+  pythonProcess = spawn('python', [PYTHON_SCRIPT, 'server'], {
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
 
-    python.stderr.on('data', (data) => {
-      stderr += data.toString();
-      // Log Python messages (model loading, etc.)
-      console.log('[Python]', data.toString().trim());
-    });
+  let stderrBuffer = '';
 
-    python.on('close', (code) => {
-      if (code !== 0) {
-        logger.error('Python script error', { stderr, code });
-        reject(new Error(`Python script failed: ${stderr}`));
-        return;
-      }
-
+ pythonProcess.stderr.on('data', (data) => {
+  const message = data.toString();
+  stderrBuffer += message;
+  
+  // ✅ Only log important messages (ignore InsightFace debug spam)
+  if (message.includes('Model loaded') || 
+      message.includes('Error') || 
+      message.includes('Exception') ||
+      message.includes('WARNING')) {
+    console.log('[Python]', message.trim());
+  }
+  
+  if (message.includes('Model loaded successfully')) {
+    pythonReady = true;
+    logger.info('Python model ready');
+  }
+});
+  pythonProcess.stdout.on('data', (data) => {
+    const lines = data.toString().split('\n');
+    
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      
       try {
-        // Extract JSON from mixed output
-        let jsonLine = '';
-
-        const lines = stdout.split('\n');
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('{') && trimmed.includes('"success"')) {
-            jsonLine = trimmed;
-            break;
-          }
+        const response = JSON.parse(line);
+        const reqId = response.requestId;
+        
+        if (pendingRequests.has(reqId)) {
+          const { resolve } = pendingRequests.get(reqId);
+          pendingRequests.delete(reqId);
+          resolve(response.result);
         }
-
-        if (!jsonLine) {
-          const jsonMatch = stdout.match(/\{[\s\S]*"success"[\s\S]*\}/);
-          if (jsonMatch) {
-            jsonLine = jsonMatch[0];
-          }
-        }
-
-        if (!jsonLine) {
-          logger.error('No valid JSON found in output', {
-            stdout: stdout.substring(0, 500),
-          });
-          reject(new Error('No valid JSON found in Python output'));
-          return;
-        }
-
-        const result = JSON.parse(jsonLine);
-
-        if (!result.success) {
-          logger.warn('Python returned error', { error: result.error });
-        }
-
-        resolve(result);
       } catch (err) {
-        logger.error('Failed to parse Python output', {
-          stdout: stdout.substring(0, 500),
-          err,
-        });
-        reject(new Error('Invalid Python output'));
+        logger.error('Failed to parse Python response', { line });
+      }
+    }
+  });
+
+  pythonProcess.on('close', (code) => {
+    logger.warn('Python process closed', { code });
+    pythonProcess = null;
+    pythonReady = false;
+    
+    // Reject all pending requests
+    for (const [reqId, { reject }] of pendingRequests.entries()) {
+      reject(new Error('Python process died'));
+    }
+    pendingRequests.clear();
+  });
+
+  pythonProcess.on('error', (err) => {
+    logger.error('Python process error', { err });
+    pythonProcess = null;
+    pythonReady = false;
+  });
+
+  return pythonProcess;
+}
+
+/**
+ * Send command to persistent Python process
+ */
+function runPythonCommand(command, args, timeout = PYTHON_TIMEOUT) {
+  return new Promise((resolve, reject) => {
+    const process = startPythonProcess();
+    
+    const reqId = ++requestId;
+    const timeoutHandle = setTimeout(() => {
+      if (pendingRequests.has(reqId)) {
+        pendingRequests.delete(reqId);
+        reject(new Error(`Python command timed out after ${timeout}ms`));
+      }
+    }, timeout);
+
+    pendingRequests.set(reqId, { 
+      resolve: (result) => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      },
+      reject: (err) => {
+        clearTimeout(timeoutHandle);
+        reject(err);
       }
     });
+
+    const request = {
+      requestId: reqId,
+      command,
+      args
+    };
+
+    process.stdin.write(JSON.stringify(request) + '\n');
   });
 }
 
 /**
- * Extract face from selfie (for registration etc.)
- * Uses buffalo_l embedding from face_service.py
+ * Extract face from selfie
  */
 async function extractFaceFromSelfie(imagePath) {
   try {
@@ -91,7 +140,7 @@ async function extractFaceFromSelfie(imagePath) {
       logger.warn('Face extraction failed', { error: result.error });
     }
 
-    return result; // { success, embedding, confidence, ... }
+    return result;
   } catch (error) {
     logger.error('extractFaceFromSelfie error', { error: error.message });
     return { success: false, error: error.message };
@@ -99,18 +148,23 @@ async function extractFaceFromSelfie(imagePath) {
 }
 
 /**
- * Extract all faces from a photo (for event photos)
+ * Extract all faces from photo
  */
 async function extractFaces(imagePath) {
   try {
     logger.info('Extracting faces from photo', { imagePath });
-    const result = await runPythonCommand('extract_photo', [imagePath]);
-
+    const result = await runPythonCommand('extract_photo', [imagePath], PYTHON_TIMEOUT);
+    
     if (!result.success) {
       logger.warn('Face extraction failed', { error: result.error });
+    } else {
+      logger.info('Faces extracted', { 
+        faces: result.faces_detected,
+        file: path.basename(imagePath)
+      });
     }
 
-    return result; // { success, faces, faces_detected }
+    return result;
   } catch (error) {
     logger.error('extractFaces error', { error: error.message });
     return { success: false, error: error.message };
@@ -118,9 +172,7 @@ async function extractFaces(imagePath) {
 }
 
 /**
- * Find matching photos using temp file instead of long CLI args.
- * selfieEmbedding: buffalo_l embedding from extractFaceFromSelfie / extract_embedding
- * eventPhotos: [{ id: string, faces: [{ embedding: [...], ... }] }]
+ * Find matching photos
  */
 async function findMatchingPhotos(selfieEmbedding, eventPhotos) {
   let tempFile = null;
@@ -132,44 +184,44 @@ async function findMatchingPhotos(selfieEmbedding, eventPhotos) {
     await fs.ensureDir(tempDir);
 
     tempFile = path.join(tempDir, `match-input-${Date.now()}.json`);
+
     const inputData = {
       user_embedding: selfieEmbedding,
       event_photos: eventPhotos,
+      threshold: 0.6
     };
+
     await fs.writeJson(tempFile, inputData);
 
-    logger.info('Created temp file for matching', { tempFile });
-
-    const result = await runPythonCommand('match_from_file', [tempFile]);
+    const timeout = 60000 + (eventPhotos.length * 100);
+    const result = await runPythonCommand('match_from_file', [tempFile], timeout);
 
     if (!result.success) {
       logger.warn('Matching failed', { error: result.error });
+    } else {
+      logger.info('Matching completed', {
+        matches: result.total_matches || 0,
+        faces_searched: result.total_faces_searched || 0,
+      });
     }
 
-    logger.info('Matching completed', {
-      matches: result.total_matches || 0,
-      faces_searched: result.total_faces_searched || 0,
-    });
-
     return result;
+
   } catch (error) {
     logger.error('findMatchingPhotos error', { error: error.message });
     return { success: false, error: error.message };
+    
   } finally {
     if (tempFile) {
       await fs.remove(tempFile).catch((err) => {
-        logger.warn('Failed to delete temp file', {
-          tempFile,
-          error: err.message,
-        });
+        logger.warn('Failed to delete temp file', { tempFile, error: err.message });
       });
     }
   }
 }
 
 /**
- * Extract face embedding from an image (generic endpoint)
- * Same as extract_selfie but kept for compatibility
+ * Extract face embedding (alias)
  */
 async function extractFaceEmbedding(imagePath) {
   try {
@@ -187,9 +239,31 @@ async function extractFaceEmbedding(imagePath) {
   }
 }
 
+/**
+ * Get model status
+ */
+function getModelStatus() {
+  return {
+    loaded: pythonReady,
+    model: 'buffalo_l',
+    processActive: pythonProcess !== null
+  };
+}
+
+/**
+ * Cleanup on shutdown
+ */
+process.on('SIGINT', () => {
+  if (pythonProcess) {
+    logger.info('Shutting down Python process');
+    pythonProcess.kill();
+  }
+});
+
 module.exports = {
   extractFaceFromSelfie,
   extractFaces,
   findMatchingPhotos,
   extractFaceEmbedding,
+  getModelStatus
 };

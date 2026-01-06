@@ -135,16 +135,22 @@ export const authAPI = {
   changePassword: (passwords) => api.put('/auth/change-password', passwords)
 };
 
-/**
- * Event API endpoints
- */
+
 export const eventAPI = {
+  // Get all events for logged-in user
   getAll: () => api.get('/events'),
-  getById: (id) => api.get(`/events/${id}`),
-  getByQRCode: (qrCode) => api.get(`/events/qr/${qrCode}`),
+  
+  // Create new event
   create: (eventData) => api.post('/events', eventData),
+  
+  // Get single event
+  getById: (id) => api.get(`/events/${id}`),
+  
+  // Update event
   update: (id, eventData) => api.put(`/events/${id}`, eventData),
-  delete: (id) => api.delete(`/events/${id}`)
+  
+  // Delete event
+  delete: (id) => api.delete(`/events/${id}`),
 };
 
 /**
