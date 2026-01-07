@@ -134,24 +134,21 @@ export const authAPI = {
   updateProfile: (updates) => api.put('/auth/update-profile', updates),
   changePassword: (passwords) => api.put('/auth/change-password', passwords)
 };
-
-
 export const eventAPI = {
   // Get all events for logged-in user
   getAll: () => api.get('/events'),
-  
   // Create new event
   create: (eventData) => api.post('/events', eventData),
-  
-  // Get single event
+  // Get single event by ID
   getById: (id) => api.get(`/events/${id}`),
-  
+  // ✅ Get event by QR code (for guest registration)
+  getByQRCode: (qrCode) => api.get(`/events/qr/${qrCode}`),
   // Update event
   update: (id, eventData) => api.put(`/events/${id}`, eventData),
-  
   // Delete event
   delete: (id) => api.delete(`/events/${id}`),
 };
+
 
 /**
  * Registration API endpoints
