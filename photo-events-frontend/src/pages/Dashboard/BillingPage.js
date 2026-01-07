@@ -4,7 +4,6 @@ import './BillingPage.css';
 
 const BillingPage = () => {
   const { user } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState(user?.subscription?.plan || 'free');
   const [billingCycle, setBillingCycle] = useState('monthly');
 
   const plans = [
