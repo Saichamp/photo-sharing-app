@@ -7,6 +7,7 @@ const fs = require('fs-extra');
 const { logger } = require('../../utils/logger');
 
 const PYTHON_SCRIPT = path.join(__dirname, 'face_service.py');
+const PYTHON_TIMEOUT = 300000; // ✅ Increased to 5 minutes (300 seconds)
 
 function runPythonCommand(command, args) {
   return new Promise((resolve, reject) => {
@@ -14,6 +15,14 @@ function runPythonCommand(command, args) {
 
     let stdout = '';
     let stderr = '';
+    let timedOut = false;
+
+    // ✅ Add timeout handler
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      python.kill();
+      reject(new Error(`Python command timed out after ${PYTHON_TIMEOUT}ms`));
+    }, PYTHON_TIMEOUT);
 
     python.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -26,6 +35,10 @@ function runPythonCommand(command, args) {
     });
 
     python.on('close', (code) => {
+      clearTimeout(timeout);
+      
+      if (timedOut) return; // Already rejected
+
       if (code !== 0) {
         logger.error('Python script error', { stderr, code });
         reject(new Error(`Python script failed: ${stderr}`));
@@ -135,6 +148,7 @@ async function findMatchingPhotos(selfieEmbedding, eventPhotos) {
     const inputData = {
       user_embedding: selfieEmbedding,
       event_photos: eventPhotos,
+      threshold: 0.4 // ✅ Lower threshold for better matches
     };
     await fs.writeJson(tempFile, inputData);
 
