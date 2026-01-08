@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-//import './GuestGallery.css';
+import './GuestGallery.css';
 
 const GuestGallery = () => {
   const { registrationId } = useParams();
@@ -14,14 +14,12 @@ const GuestGallery = () => {
     try {
       console.log('🔍 Fetching photos for registration:', registrationId);
       
-      // ✅ NO TOKEN NEEDED - This is a public endpoint for guests
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/photos/matches/${registrationId}`,
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/photos/matches/${registrationId}`,
         {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
-            // No Authorization header needed for guest gallery
           }
         }
       );
@@ -33,8 +31,9 @@ const GuestGallery = () => {
       const data = await response.json();
       console.log('📸 Photos received:', data);
 
-      setPhotos(data.photos || []);
-      setRegistration(data.registration || null);
+      // ✅ FIX: Access nested data.data.photos
+      setPhotos(data.data.photos || []);
+      setRegistration(data.data.registration || null);
       setError(null);
       setLoading(false);
       setProcessing(false);
@@ -46,6 +45,11 @@ const GuestGallery = () => {
       setProcessing(false);
     }
   }, [registrationId]);
+
+  // ✅ Call loadPhotos when component mounts
+  useEffect(() => {
+    loadPhotos();
+  }, [loadPhotos]);
 
   if (loading) {
     return (
@@ -122,13 +126,17 @@ const GuestGallery = () => {
       {photos.length > 0 && (
         <div className="photos-grid">
           {photos.map((photo) => (
-            <div key={photo._id} className="photo-card">
+            <div key={photo.id || photo._id} className="photo-card">
               <div className="photo-wrapper">
                 <img
-                  src={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${photo.path}`}
+                  src={photo.url}
                   alt={photo.filename}
                   className="photo-image"
                   loading="lazy"
+                  onError={(e) => {
+                    console.error('Failed to load image:', photo.url);
+                    e.target.src = 'https://via.placeholder.com/400x300?text=Image+Not+Found';
+                  }}
                 />
                 {photo.similarity && (
                   <div className="match-badge">
@@ -138,13 +146,19 @@ const GuestGallery = () => {
               </div>
               <div className="photo-info">
                 <p className="photo-date">
-                  {new Date(photo.uploadedAt || photo.createdAt).toLocaleDateString()}
+                  {new Date(photo.uploadedAt || photo.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
                 </p>
               </div>
               <a
-                href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${photo.path}`}
-                download
+                href={photo.url}
+                download={photo.filename}
                 className="download-btn"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 ⬇️ Download
               </a>
