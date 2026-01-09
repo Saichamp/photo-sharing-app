@@ -1,7 +1,6 @@
 /**
  * Node.js Wrapper for Python Face Recognition Service (buffalo_l)
  */
-
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs-extra');
@@ -122,17 +121,12 @@ async function extractFaces(imagePath) {
  * Find matching photos using temp file instead of long CLI args.
  * selfieEmbedding: buffalo_l embedding from extractFaceFromSelfie / extract_embedding
  * eventPhotos: [{ id: string, faces: [{ embedding: [...], ... }] }]
- * threshold: Distance threshold (0.55 = ~45% similarity, 0.60 = ~40% similarity)
  */
-async function findMatchingPhotos(selfieEmbedding, eventPhotos, threshold = 0.55) {
+async function findMatchingPhotos(selfieEmbedding, eventPhotos) {
   let tempFile = null;
 
   try {
-    logger.info('Finding matching photos', { 
-      totalPhotos: eventPhotos.length,
-      threshold: threshold,
-      totalFaces: eventPhotos.reduce((sum, p) => sum + (p.faces?.length || 0), 0)
-    });
+    logger.info('Finding matching photos', { totalPhotos: eventPhotos.length });
 
     const tempDir = path.join(__dirname, '../../temp');
     await fs.ensureDir(tempDir);
@@ -141,47 +135,21 @@ async function findMatchingPhotos(selfieEmbedding, eventPhotos, threshold = 0.55
     const inputData = {
       user_embedding: selfieEmbedding,
       event_photos: eventPhotos,
-      threshold: threshold
     };
     await fs.writeJson(tempFile, inputData);
 
-    logger.info('Created temp file for matching', { tempFile, threshold });
+    logger.info('Created temp file for matching', { tempFile });
 
     const result = await runPythonCommand('match_from_file', [tempFile]);
 
     if (!result.success) {
       logger.warn('Matching failed', { error: result.error });
-    } else {
-      // Log detailed results
-      logger.info('Matching completed', {
-        matches: result.total_matches || 0,
-        faces_searched: result.total_faces_searched || 0,
-        threshold_used: result.threshold_used
-      });
-      
-      // Log debug info for tuning
-      if (result.debug_info) {
-        const matched = result.debug_info.filter(d => d.matched);
-        const nearMisses = result.debug_info.filter(d => !d.matched && d.distance < 0.65);
-        
-        logger.info('Match statistics', {
-          total_comparisons: result.debug_info.length,
-          matches: matched.length,
-          near_misses: nearMisses.length
-        });
-        
-        if (nearMisses.length > 0) {
-          logger.warn('Near misses found (consider lowering threshold)', {
-            count: nearMisses.length,
-            examples: nearMisses.slice(0, 3).map(m => ({
-              photo_id: m.photo_id,
-              distance: m.distance.toFixed(3),
-              similarity: (m.similarity * 100).toFixed(1) + '%'
-            }))
-          });
-        }
-      }
     }
+
+    logger.info('Matching completed', {
+      matches: result.total_matches || 0,
+      faces_searched: result.total_faces_searched || 0,
+    });
 
     return result;
   } catch (error) {

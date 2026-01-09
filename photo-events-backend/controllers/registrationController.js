@@ -11,114 +11,9 @@ const faceRecognitionService = require('../services/faceRecognition/faceRecognit
 const { isValidObjectId } = require('../utils/validators');
 const path = require('path');
 
-// ============================================
-// ✅ HELPER FUNCTIONS FOR FACE MATCHING
-// ============================================
-
-/**
- * Calculate cosine similarity between two embeddings
- */
-function calculateCosineSimilarity(embedding1, embedding2) {
-  if (!embedding1 || !embedding2 || embedding1.length !== embedding2.length) {
-    return 0;
-  }
-  
-  let dotProduct = 0;
-  let norm1 = 0;
-  let norm2 = 0;
-  
-  for (let i = 0; i < embedding1.length; i++) {
-    dotProduct += embedding1[i] * embedding2[i];
-    norm1 += embedding1[i] * embedding1[i];
-    norm2 += embedding2[i] * embedding2[i];
-  }
-  
-  const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2);
-  return magnitude === 0 ? 0 : dotProduct / magnitude;
-}
-
-/**
- * Match a registration against all event photos
- */
-async function matchRegistrationWithPhotos(registration) {
-  try {
-    const Photo = require('../models/Photo');
-    const config = require('../config/config');
-    
-    // Get all processed photos with faces for this event
-    const photos = await Photo.find({
-      eventId: registration.eventId,
-      processed: true,
-      'faces.0': { $exists: true }
-    });
-
-    if (photos.length === 0 || !registration.faceEmbedding) {
-      logger.info('No photos to match', { 
-        registrationId: registration._id,
-        photosFound: photos.length,
-        hasFaceData: !!registration.faceEmbedding
-      });
-      return;
-    }
-
-    let totalMatches = 0;
-
-    // Match against each photo
-    for (const photo of photos) {
-      const matches = [];
-      
-      for (const photoFace of photo.faces) {
-        const similarity = calculateCosineSimilarity(
-          registration.faceEmbedding,
-          photoFace.embedding
-        );
-        
-        const threshold = config.faceRecognition?.matchThreshold || 0.6;
-        
-        if (similarity >= threshold) {
-          matches.push({
-            registrationId: registration._id,
-            email: registration.email,
-            similarity
-          });
-          totalMatches++;
-        }
-      }
-      
-      if (matches.length > 0) {
-        photo.matches = photo.matches || [];
-        photo.matches.push(...matches);
-        await photo.save();
-        
-        logger.info('Match found', {
-          photoId: photo._id,
-          registrationId: registration._id,
-          matchCount: matches.length
-        });
-      }
-    }
-
-    logger.info('Registration matching complete', {
-      registrationId: registration._id,
-      totalPhotos: photos.length,
-      totalMatches
-    });
-
-  } catch (error) {
-    logger.error('Face matching failed after registration', {
-      registrationId: registration._id,
-      error: error.message
-    });
-  }
-}
-
-// ============================================
-// ✅ CONTROLLER METHODS
-// ============================================
-
 /**
  * @desc Register guest for an event
- * @route POST /api/registrations/register
+ * @route POST /api/registrations
  * @access Public
  */
 exports.registerGuest = asyncHandler(async (req, res, next) => {
@@ -192,22 +87,6 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
 
   // Increment event registration count
   await event.incrementRegistration();
-
-  // ✅ NEW: Match against existing event photos
-  if (faceEmbedding) {
-    // Run matching in background (don't wait for it)
-    matchRegistrationWithPhotos(registration).catch(err => {
-      logger.error('Background face matching failed', {
-        registrationId: registration._id,
-        error: err.message
-      });
-    });
-    
-    logger.info('Triggered face matching for new registration', {
-      registrationId: registration._id,
-      eventId
-    });
-  }
 
   logDatabase('CREATE', 'registrations', {
     registrationId: registration._id,
