@@ -1,4 +1,3 @@
-
 /**
  * Photo Controller for PhotoManEa
  * Handles photo upload and management with access control
@@ -18,67 +17,8 @@ const faceRecognitionService = require('../services/faceRecognition/faceRecognit
 const { isValidObjectId } = require('../utils/validators');
 
 /**
- * ✅ PROCESSING QUEUE - Prevents CPU overload
- * Processes 2 photos at a time with cooling delay
- */
-const processingQueue = [];
-let activeProcessing = 0;
-const MAX_CONCURRENT = 2; // Process 2 photos simultaneously
-
-async function addToProcessingQueue(photo, eventId) {
-  processingQueue.push({ photo, eventId });
-  processNextInQueue();
-}
-
-async function processNextInQueue() {
-  if (activeProcessing >= MAX_CONCURRENT || processingQueue.length === 0) {
-    return;
-  }
-
-  activeProcessing++;
-  const { photo, eventId } = processingQueue.shift();
-
-  try {
-    console.log(`🤖 Processing ${photo.filename} (${processingQueue.length} remaining, ${activeProcessing} active)`);
-
-    const result = await faceRecognitionService.extractFaces(photo.path);
-
-    if (result.success && result.faces && result.faces.length > 0) {
-      const normalizedFaces = normalizeFaces(result.faces);
-      photo.faces = normalizedFaces;
-      photo.processed = true;
-      photo.processingError = null;
-      await photo.save();
-      
-      console.log(`✅ Found ${result.faces.length} faces in ${photo.filename}`);
-      
-      await matchPhotoWithRegistrations(photo, eventId);
-    } else {
-      photo.processed = true;
-      photo.processingError = 'No faces detected';
-      await photo.save();
-      console.log(`⚠️ No faces in ${photo.filename}`);
-    }
-
-    // ✅ 1 second cooling delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-  } catch (error) {
-    logger.error('Face processing failed', {
-      photoId: photo._id,
-      error: error.message,
-    });
-    photo.processed = true;
-    photo.processingError = error.message;
-    await photo.save();
-  } finally {
-    activeProcessing--;
-    processNextInQueue();
-  }
-}
-
-/**
  * Helper: normalize faces to match Photo FaceSchema
+ * Ensures faceIndex exists and gender is 'M' or 'F'
  */
 function normalizeFaces(faces) {
   if (!Array.isArray(faces)) return [];
@@ -108,47 +48,28 @@ function normalizeFaces(faces) {
 exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   const { eventId } = req.body;
 
-  // 1. Check Authentication
-  if (!req.user || !req.user._id) {
-    console.log('❌ Upload failed: req.user is undefined');
-    throw new AppError('Authentication required. Please log in.', 401);
-  }
-
-  console.log('✅ Upload request from user:', req.user.email, '| ID:', req.user._id);
-
-  // 2. Validate Request
+  // 1. Validate Request
   if (!eventId) throw new AppError('Event ID is required', 400);
   if (!isValidObjectId(eventId)) throw new AppError('Invalid event ID format', 400);
   if (!req.files || req.files.length === 0) throw new AppError('No photos uploaded', 400);
 
-  console.log('📤 Uploading', req.files.length, 'photos to event:', eventId);
-
-  // 3. Find Event
+  // 2. Find Event
   const event = await Event.findById(eventId);
   if (!event) throw new AppError('Event not found', 404);
 
-  // 4. Check Permission
-  const eventOwnerId = event.userId || event.createdBy || event.organizer;
-
-  if (!eventOwnerId) {
-    console.error('❌ Event has no owner:', event);
-    throw new AppError('Event owner information is missing', 500);
-  }
-
-  if (eventOwnerId.toString() !== req.user._id.toString()) {
-    console.log('❌ Permission denied - Event owner:', eventOwnerId, '| User:', req.user._id);
+  // 3. Check Permission
+  if (event.userId.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to upload photos to this event', 403);
   }
-
-  console.log('✅ Permission granted - User owns this event');
 
   const createdPhotos = [];
   const errors = [];
   let totalUploadedSize = 0;
 
-  // 5. Process Files
+  // 4. Process Files Safely
   for (const file of req.files) {
     try {
+      // Windows-safe URL
       const relativePath = file.path.replace(/\\/g, '/').replace(/^uploads[\\/]/, '');
       const url = `${req.protocol}://${req.get('host')}/uploads/${relativePath}`;
 
@@ -169,19 +90,56 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
       createdPhotos.push(photo);
       totalUploadedSize += file.size;
 
-      console.log('✅ Photo saved:', file.filename, '| Size:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      // Background Processing
+      setImmediate(async () => {
+        try {
+          const result = await faceRecognitionService.extractFaces(photo.path);
 
-      // ✅ Add to processing queue (controlled processing)
-      addToProcessingQueue(photo, eventId);
+          if (result.success && result.faces && result.faces.length > 0) {
+            const normalizedFaces = normalizeFaces(result.faces);
+            photo.faces = normalizedFaces;
+            photo.processed = true;
+            photo.processingError = null;
 
+            try {
+              await photo.save();
+            } catch (err) {
+              logger.error('Background processing failed', {
+                photoId: photo._id,
+                error: err.message,
+              });
+              photo.processed = true;
+              photo.processingError = err.message;
+              await photo.save().catch(() => {});
+              return;
+            }
+
+            await matchPhotoWithRegistrations(photo, eventId);
+          } else {
+            photo.processed = true;
+            photo.processingError = 'No faces detected';
+            await photo.save().catch(() => {});
+          }
+        } catch (error) {
+          logger.error('Background processing failed', {
+            photoId: photo._id,
+            error: error.message,
+          });
+          photo.processed = true;
+          photo.processingError = error.message;
+          await photo.save().catch(() => {});
+        }
+      });
     } catch (err) {
-      console.error(`❌ Failed to save photo ${file.originalname}:`, err);
+      console.error(`Failed to save photo ${file.originalname}:`, err);
       errors.push({ file: file.originalname, error: err.message });
+
+      // Cleanup orphaned file
       await fs.unlink(file.path).catch(() => {});
     }
   }
 
-  // 6. Update Stats
+  // 5. Update Stats
   if (totalUploadedSize > 0) {
     if (typeof event.incrementPhotoStats === 'function') {
       await event.incrementPhotoStats(totalUploadedSize, createdPhotos.length);
@@ -195,25 +153,24 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
       await req.user.incrementStorageUsage(totalUploadedSize);
     }
 
-    console.log(`✅ Updated event stats: ${createdPhotos.length} photos added | Total size: ${(totalUploadedSize / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`✅ Updated event stats: ${createdPhotos.length} photos added`);
   }
 
   successResponse(
     res,
     {
-      photos: createdPhotos.map((p) => ({ id: p._id, filename: p.filename, url: p.url })),
+      photos: createdPhotos.map((p) => ({ id: p._id, filename: p.filename })),
       uploaded: createdPhotos.length,
       failed: errors.length,
       errors,
-      queueSize: processingQueue.length + activeProcessing,
-      estimatedTime: `${Math.ceil((processingQueue.length + activeProcessing) * 3 / 60)} minutes`
     },
-    'Photos uploaded successfully. Processing started.',
+    'Photos processed',
     201
   );
 });
+
 /**
- * @desc Get all photos for an event (with pagination)
+ * @desc Get all photos for an event
  * @route GET /api/photos/event/:eventId
  * @access Private or Public with registration
  */
@@ -229,6 +186,9 @@ exports.getEventPhotos = asyncHandler(async (req, res, next) => {
   if (!event) {
     throw new AppError('Event not found', 404);
   }
+
+  // Phase 1: allow public; will tighten later
+  let hasAccess = true;
 
   const skip = (page - 1) * limit;
   const photos = await Photo.find({ eventId, processed: true })
@@ -340,9 +300,7 @@ exports.getPhotoById = asyncHandler(async (req, res, next) => {
     throw new AppError('Associated event not found', 404);
   }
 
-  const eventOwnerId = event.userId || event.createdBy || event.organizer;
-
-  if (req.user && eventOwnerId && eventOwnerId.toString() === req.user._id.toString()) {
+  if (req.user && event.userId.toString() === req.user._id.toString()) {
     successResponse(res, photo, 'Photo retrieved successfully');
   } else {
     successResponse(
@@ -375,14 +333,12 @@ exports.deletePhoto = asyncHandler(async (req, res, next) => {
     throw new AppError('Photo not found', 404);
   }
 
-  const event = await Event.findById(photo.eventId);
+  const event = await Photo.findById(photo.eventId);
   if (!event) {
     throw new AppError('Associated event not found', 404);
   }
 
-  const eventOwnerId = event.userId || event.createdBy || event.organizer;
-
-  if (!eventOwnerId || eventOwnerId.toString() !== req.user._id.toString()) {
+  if (event.userId.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to delete this photo', 403);
   }
 
@@ -437,9 +393,7 @@ exports.processPhotoFaces = asyncHandler(async (req, res, next) => {
   }
 
   const event = await Event.findById(photo.eventId);
-  const eventOwnerId = event?.userId || event?.createdBy || event?.organizer;
-
-  if (!event || !eventOwnerId || eventOwnerId.toString() !== req.user._id.toString()) {
+  if (!event || event.userId.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to process this photo', 403);
   }
 
@@ -521,9 +475,7 @@ exports.getPhotoStats = asyncHandler(async (req, res, next) => {
     throw new AppError('Event not found', 404);
   }
 
-  const eventOwnerId = event.userId || event.createdBy || event.organizer;
-
-  if (!eventOwnerId || eventOwnerId.toString() !== req.user._id.toString()) {
+  if (event.userId.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to view these statistics', 403);
   }
 
