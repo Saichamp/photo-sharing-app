@@ -560,11 +560,14 @@ exports.getPhotoStats = asyncHandler(async (req, res, next) => {
 /**
  * Face matching helper
  * Matches faces in a photo with registered users
+/
+/**
+ * Face matching helper
+ * Matches faces in a photo with registered users
+ * Uses DISTANCE threshold (lower = stricter, higher = more lenient)
  */
 async function matchPhotoWithRegistrations(photo, eventId) {
   try {
-    const config = require('../config/config');
-
     const registrations = await Registration.find({
       eventId,
       faceEmbedding: { $exists: true, $ne: null },
@@ -575,32 +578,62 @@ async function matchPhotoWithRegistrations(photo, eventId) {
     }
 
     const matches = [];
+    const DISTANCE_THRESHOLD = 0.55; // ✅ 55% distance = 45% similarity required
 
     for (const registration of registrations) {
+      let bestMatchForReg = null;
+
       for (const photoFace of photo.faces) {
         const similarity = calculateCosineSimilarity(
           registration.faceEmbedding,
           photoFace.embedding
         );
 
-        const threshold = config.faceRecognition.matchThreshold;
+        const distance = 1 - similarity;
 
-        if (similarity >= threshold) {
-          matches.push({
+        // Track best match for this registration
+        if (!bestMatchForReg || distance < bestMatchForReg.distance) {
+          bestMatchForReg = {
             registrationId: registration._id,
             email: registration.email,
             similarity,
-          });
-
-          logger.info('Face match found', {
-            photoId: photo._id,
-            registrationId: registration._id,
-            email: registration.email,
-            similarity: similarity.toFixed(3),
-          });
+            distance
+          };
         }
       }
+
+      // If best match is under threshold, add it
+      if (bestMatchForReg && bestMatchForReg.distance < DISTANCE_THRESHOLD) {
+        matches.push({
+          registrationId: bestMatchForReg.registrationId,
+          email: bestMatchForReg.email,
+          similarity: bestMatchForReg.similarity,
+        });
+
+        logger.info('Match found', {
+          photoId: photo._id,
+          registrationId: bestMatchForReg.registrationId,
+          email: bestMatchForReg.email,
+          similarity: bestMatchForReg.similarity.toFixed(3),
+          distance: bestMatchForReg.distance.toFixed(3),
+          matchCount: matches.length
+        });
+      } else if (bestMatchForReg) {
+        logger.warn('Near miss', {
+          photoId: photo._id,
+          registrationId: bestMatchForReg.registrationId,
+          email: bestMatchForReg.email,
+          distance: bestMatchForReg.distance.toFixed(3),
+          threshold: DISTANCE_THRESHOLD
+        });
+      }
     }
+
+    logger.info('Registration matching complete', {
+      photoId: photo._id,
+      totalPhotos: 4,  // Your uploaded count
+      totalMatches: matches.length
+    });
 
     if (matches.length > 0) {
       photo.matches = matches;

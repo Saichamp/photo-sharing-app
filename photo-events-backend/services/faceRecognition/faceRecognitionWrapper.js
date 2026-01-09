@@ -1,13 +1,13 @@
 /**
  * Node.js Wrapper for Python Face Recognition Service (buffalo_l)
  */
+
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs-extra');
 const { logger } = require('../../utils/logger');
 
 const PYTHON_SCRIPT = path.join(__dirname, 'face_service.py');
-const PYTHON_TIMEOUT = 300000; // ✅ Increased to 5 minutes (300 seconds)
 
 function runPythonCommand(command, args) {
   return new Promise((resolve, reject) => {
@@ -15,14 +15,6 @@ function runPythonCommand(command, args) {
 
     let stdout = '';
     let stderr = '';
-    let timedOut = false;
-
-    // ✅ Add timeout handler
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      python.kill();
-      reject(new Error(`Python command timed out after ${PYTHON_TIMEOUT}ms`));
-    }, PYTHON_TIMEOUT);
 
     python.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -35,10 +27,6 @@ function runPythonCommand(command, args) {
     });
 
     python.on('close', (code) => {
-      clearTimeout(timeout);
-      
-      if (timedOut) return; // Already rejected
-
       if (code !== 0) {
         logger.error('Python script error', { stderr, code });
         reject(new Error(`Python script failed: ${stderr}`));
@@ -134,12 +122,17 @@ async function extractFaces(imagePath) {
  * Find matching photos using temp file instead of long CLI args.
  * selfieEmbedding: buffalo_l embedding from extractFaceFromSelfie / extract_embedding
  * eventPhotos: [{ id: string, faces: [{ embedding: [...], ... }] }]
+ * threshold: Distance threshold (0.55 = ~45% similarity, 0.60 = ~40% similarity)
  */
-async function findMatchingPhotos(selfieEmbedding, eventPhotos) {
+async function findMatchingPhotos(selfieEmbedding, eventPhotos, threshold = 0.55) {
   let tempFile = null;
 
   try {
-    logger.info('Finding matching photos', { totalPhotos: eventPhotos.length });
+    logger.info('Finding matching photos', { 
+      totalPhotos: eventPhotos.length,
+      threshold: threshold,
+      totalFaces: eventPhotos.reduce((sum, p) => sum + (p.faces?.length || 0), 0)
+    });
 
     const tempDir = path.join(__dirname, '../../temp');
     await fs.ensureDir(tempDir);
@@ -148,22 +141,47 @@ async function findMatchingPhotos(selfieEmbedding, eventPhotos) {
     const inputData = {
       user_embedding: selfieEmbedding,
       event_photos: eventPhotos,
-      threshold: 0.4 // ✅ Lower threshold for better matches
+      threshold: threshold
     };
     await fs.writeJson(tempFile, inputData);
 
-    logger.info('Created temp file for matching', { tempFile });
+    logger.info('Created temp file for matching', { tempFile, threshold });
 
     const result = await runPythonCommand('match_from_file', [tempFile]);
 
     if (!result.success) {
       logger.warn('Matching failed', { error: result.error });
+    } else {
+      // Log detailed results
+      logger.info('Matching completed', {
+        matches: result.total_matches || 0,
+        faces_searched: result.total_faces_searched || 0,
+        threshold_used: result.threshold_used
+      });
+      
+      // Log debug info for tuning
+      if (result.debug_info) {
+        const matched = result.debug_info.filter(d => d.matched);
+        const nearMisses = result.debug_info.filter(d => !d.matched && d.distance < 0.65);
+        
+        logger.info('Match statistics', {
+          total_comparisons: result.debug_info.length,
+          matches: matched.length,
+          near_misses: nearMisses.length
+        });
+        
+        if (nearMisses.length > 0) {
+          logger.warn('Near misses found (consider lowering threshold)', {
+            count: nearMisses.length,
+            examples: nearMisses.slice(0, 3).map(m => ({
+              photo_id: m.photo_id,
+              distance: m.distance.toFixed(3),
+              similarity: (m.similarity * 100).toFixed(1) + '%'
+            }))
+          });
+        }
+      }
     }
-
-    logger.info('Matching completed', {
-      matches: result.total_matches || 0,
-      faces_searched: result.total_faces_searched || 0,
-    });
 
     return result;
   } catch (error) {
