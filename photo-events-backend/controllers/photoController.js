@@ -58,7 +58,7 @@ exports.uploadPhotos = asyncHandler(async (req, res, next) => {
   if (!event) throw new AppError('Event not found', 404);
 
   // 3. Check Permission
-  if (event.userId.toString() !== req.user._id.toString()) {
+  if (event.organizer.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to upload photos to this event', 403);
   }
 
@@ -232,13 +232,7 @@ exports.getAllEventPhotos = asyncHandler(async (req, res, next) => {
   }
 
   // Check permission
-  const eventOwnerId = event.userId || event.createdBy || event.organizer;
-  
-  if (!eventOwnerId) {
-    throw new AppError('Event owner information is missing', 500);
-  }
-
-  if (req.user && eventOwnerId.toString() !== req.user._id.toString()) {
+  if (req.user && event.organizer.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to view these photos', 403);
   }
 
@@ -300,7 +294,7 @@ exports.getPhotoById = asyncHandler(async (req, res, next) => {
     throw new AppError('Associated event not found', 404);
   }
 
-  if (req.user && event.userId.toString() === req.user._id.toString()) {
+  if (req.user && event.organizer && event.organizer.toString() === req.user._id.toString()) {
     successResponse(res, photo, 'Photo retrieved successfully');
   } else {
     successResponse(
@@ -333,12 +327,12 @@ exports.deletePhoto = asyncHandler(async (req, res, next) => {
     throw new AppError('Photo not found', 404);
   }
 
-  const event = await Photo.findById(photo.eventId);
+  const event = await Event.findById(photo.eventId);
   if (!event) {
     throw new AppError('Associated event not found', 404);
   }
 
-  if (event.userId.toString() !== req.user._id.toString()) {
+  if (event.organizer.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to delete this photo', 403);
   }
 
@@ -393,7 +387,7 @@ exports.processPhotoFaces = asyncHandler(async (req, res, next) => {
   }
 
   const event = await Event.findById(photo.eventId);
-  if (!event || event.userId.toString() !== req.user._id.toString()) {
+  if (!event || event.organizer.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to process this photo', 403);
   }
 
@@ -475,7 +469,7 @@ exports.getPhotoStats = asyncHandler(async (req, res, next) => {
     throw new AppError('Event not found', 404);
   }
 
-  if (event.userId.toString() !== req.user._id.toString()) {
+  if (event.organizer.toString() !== req.user._id.toString()) {
     throw new AppError('You do not have permission to view these statistics', 403);
   }
 
