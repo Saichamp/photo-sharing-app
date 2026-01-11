@@ -16,4 +16,5 @@ router.post('/find-photos', upload.single('selfie'), findMatchingPhotos);
 // POST /api/face-matching/find-by-registration - Find photos for existing registration
 router.post('/find-by-registration', findPhotosForRegistration);
 
+
 module.exports = router;

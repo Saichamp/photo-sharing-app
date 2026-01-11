@@ -215,6 +215,70 @@ exports.getEventPhotos = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc Get ALL photos for preview page (includes unprocessed)
+ * @route GET /api/photos/event/:eventId/all
+ * @access Private
+ */
+exports.getAllEventPhotos = asyncHandler(async (req, res, next) => {
+  const { eventId } = req.params;
+
+  if (!isValidObjectId(eventId)) {
+    throw new AppError('Invalid event ID format', 400);
+  }
+
+  const event = await Event.findById(eventId);
+  if (!event) {
+    throw new AppError('Event not found', 404);
+  }
+
+  // Check permission
+  const eventOwnerId = event.userId || event.createdBy || event.organizer;
+  
+  if (!eventOwnerId) {
+    throw new AppError('Event owner information is missing', 500);
+  }
+
+  if (req.user && eventOwnerId.toString() !== req.user._id.toString()) {
+    throw new AppError('You do not have permission to view these photos', 403);
+  }
+
+  // Get ALL photos (including unprocessed) - NO PAGINATION
+  const photos = await Photo.find({ eventId })
+    .select('_id filename url uploadedAt processed faces processingError matches size mimeType')
+    .sort('-uploadedAt')
+    .lean(); // Use lean for better performance
+
+  // Calculate stats
+  const stats = {
+    total: photos.length,
+    processed: photos.filter(p => p.processed).length,
+    processing: photos.filter(p => !p.processed).length,
+    withFaces: photos.filter(p => p.processed && p.faces && p.faces.length > 0).length,
+    withErrors: photos.filter(p => p.processingError).length,
+    totalFaces: photos.reduce((sum, p) => sum + (p.faces?.length || 0), 0),
+  };
+
+  successResponse(
+    res,
+    {
+      photos: photos.map(p => ({
+        id: p._id,
+        filename: p.filename,
+        url: p.url,
+        uploadedAt: p.uploadedAt,
+        processed: p.processed,
+        faceCount: p.faces?.length || 0,
+        matchCount: p.matches?.length || 0,
+        processingError: p.processingError || null,
+        size: p.size,
+      })),
+      stats,
+    },
+    'All photos retrieved successfully'
+  );
+});
+
+/**
  * @desc Get single photo by ID
  * @route GET /api/photos/:id
  * @access Private or Public
@@ -269,7 +333,7 @@ exports.deletePhoto = asyncHandler(async (req, res, next) => {
     throw new AppError('Photo not found', 404);
   }
 
-  const event = await Event.findById(photo.eventId);
+  const event = await Photo.findById(photo.eventId);
   if (!event) {
     throw new AppError('Associated event not found', 404);
   }
@@ -527,54 +591,6 @@ function calculateCosineSimilarity(embedding1, embedding2) {
 
   const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2);
   return magnitude === 0 ? 0 : dotProduct / magnitude;
-}
-
-/**
- * Background face processing function (legacy support)
- */
-async function processPhotoInBackground(photoId, photoPath) {
-  try {
-    const result = await faceRecognitionService.extractFaces(photoPath);
-
-    if (result.success && result.facesDetected > 0) {
-      const normalizedFaces = normalizeFaces(result.faces);
-
-      const photo = await Photo.findByIdAndUpdate(
-        photoId,
-        {
-          faces: normalizedFaces,
-          processed: true,
-          processingError: null,
-        },
-        { new: true }
-      );
-
-      logAI('face-extraction-background', {
-        photoId,
-        facesDetected: result.facesDetected,
-        processingTime: result.processingTime,
-      });
-
-      if (photo) {
-        await matchPhotoWithRegistrations(photo, photo.eventId);
-      }
-    } else {
-      await Photo.findByIdAndUpdate(photoId, {
-        processed: true,
-        processingError: 'No faces detected',
-      });
-    }
-  } catch (error) {
-    logger.error('Background face processing failed', {
-      photoId,
-      error: error.message,
-    });
-
-    await Photo.findByIdAndUpdate(photoId, {
-      processed: true,
-      processingError: error.message,
-    });
-  }
 }
 
 /**

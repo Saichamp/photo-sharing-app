@@ -22,10 +22,29 @@ import MultiStepForm from './components/MultiStepForm';           // old version
 import GuestRegistration from './pages/Guest/GuestRegistration'; // new version
 import GuestGallery from './pages/Guest/GuestGallery';
 
+// Admin Pages
+import AdminDashboard from './pages/Admin/AdminDashboard';
+
 // Components
-import { Navbar } from './components/common/Navbar';
+import Navbar from "./components/common/Navbar";
+import PhotoPreview from './components/organizer/PhotoPreview';
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 
 import './App.css';
+import UserManagement from './pages/Admin/UserManagement';
+import AllEvents from './pages/Admin/AllEvents';
+import API from './services/api'; // or the correct path to your API client
+
+import SecurityLogs from './pages/Admin/SecurityLogs';
+
+import SystemMonitor from './pages/Admin/SystemMonitor';
+import ManageUsers from './pages/Admin/ManageUsers';
+import ManageEvents from './pages/Admin/ManageEvents';
+import ManagePhotos from './pages/Admin/ManagePhotos';
+import AnalyticsDashboard from './pages/Admin/AnalyticsDashboard';
+import SystemSettings from './pages/Admin/SystemSettings';
+
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -56,7 +75,9 @@ function AppRoutes() {
     <>
       {user && <Navbar />}
       <Routes>
-        {/* Public Routes */}
+        {/* ================================
+            PUBLIC ROUTES
+            ================================ */}
         <Route path="/" element={<LandingPage />} />
         <Route
           path="/login"
@@ -73,9 +94,18 @@ function AppRoutes() {
               <RegisterPage />
             </PublicRoute>
           }
+          
         />
+      <Route path="/admin/users" element={<ManageUsers />} />
+      <Route path="/admin/events" element={<ManageEvents />} />
+      <Route path="/admin/photos" element={<ManagePhotos />} />
+      <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
+      <Route path="/admin/settings" element={<SystemSettings />} />
+      <Route path="/events/:eventId/photos" element={<PhotoPreview />} />
 
-        {/* Guest Registration Routes */}
+        {/* ================================
+            GUEST REGISTRATION ROUTES
+            ================================ */}
         {/* NEW: redesigned version */}
         <Route
           path="/event/register/:eventId"
@@ -94,7 +124,9 @@ function AppRoutes() {
           element={<GuestGallery />}
         />
 
-        {/* Protected Routes */}
+        {/* ================================
+            PROTECTED ROUTES (ORGANIZER)
+            ================================ */}
         <Route
           path="/dashboard/*"
           element={
@@ -104,6 +136,55 @@ function AppRoutes() {
           }
         />
 
+        {/* ================================
+            ADMIN ROUTES (ADMIN ONLY)
+            ================================ */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDashboard />
+            </ProtectedAdminRoute>
+          }
+        />
+
+    
+<Route
+  path="/admin/users"
+  element={
+    <ProtectedAdminRoute>
+      <UserManagement />
+    </ProtectedAdminRoute>
+  }
+/>
+
+
+       <Route
+  path="/admin/events"
+  element={
+    <ProtectedAdminRoute>
+      <AllEvents />
+    </ProtectedAdminRoute>
+  }
+/>
+
+<Route
+  path="/admin/logs"
+  element={
+    <ProtectedAdminRoute>
+      <SecurityLogs />
+    </ProtectedAdminRoute>
+  }
+/>
+
+<Route
+  path="/admin/system"
+  element={
+    <ProtectedAdminRoute>
+      <SystemMonitor />
+    </ProtectedAdminRoute>
+  }
+/>
         {/* Catch all - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -120,5 +201,26 @@ function App() {
     </Router>
   );
 }
+// Admin API endpoints
+export const adminAPI = {
+  // Get dashboard stats
+  getStats: () => API.get('/admin/stats'),
+
+  // User management
+  getUsers: (params) => API.get('/admin/users', { params }),
+  deleteUser: (userId) => API.delete(`/admin/users/${userId}`),
+  updateUserStatus: (userId, isActive) => 
+    API.patch(`/admin/users/${userId}/status`, { isActive }),
+
+  // Event management
+  getAllEvents: (params) => API.get('/admin/events', { params }),
+  deleteEvent: (eventId) => API.delete(`/admin/events/${eventId}`),
+
+  // Security logs
+  getLogs: (params) => API.get('/admin/logs', { params }),
+
+  // System health
+  getSystemHealth: () => API.get('/admin/system-health')
+};
 
 export default App;

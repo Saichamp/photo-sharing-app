@@ -42,7 +42,7 @@ applySecurity(app); // Helmet, CORS, Rate Limiting, etc.
 logger.info('✅ Security middleware applied');
 
 // ============================================
-// 5. STATIC FILES
+// 5. STATIC FILES (✅ CRITICAL FOR IMAGE DISPLAY)
 // ============================================
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 logger.info('✅ Static file serving configured for /uploads');
@@ -80,30 +80,42 @@ app.get('/api/status', (req, res) => {
 logger.info('📡 Loading API routes...');
 
 try {
-  // Auth routes (AUTHENTICATION SYSTEM - NEW!)
+  // Auth routes
   app.use('/api/auth', require('./routes/auth'));
   logger.info('  ✅ Auth routes loaded');
-  
+
   // Events routes
   app.use('/api/events', require('./routes/events'));
   logger.info('  ✅ Events routes loaded');
-  
+
   // Registration routes
   app.use('/api/registrations', require('./routes/registrations'));
   logger.info('  ✅ Registration routes loaded');
-  
+
   // Photo routes
   app.use('/api/photos', require('./routes/photos'));
   logger.info('  ✅ Photo routes loaded');
-  
+
   // Face matching routes
   app.use('/api/face-matching', require('./routes/faceMatching'));
   logger.info('  ✅ Face matching routes loaded');
-  
+
+  // Admin routes
+  app.use('/api/admin', require('./routes/admin'));
+  logger.info('  ✅ Admin routes loaded');
+
+  // Settings routes
+app.use('/api/settings', require('./routes/settings'));
+logger.info('  ✅ Settings routes loaded');
+
+
+
+
   logger.info('✅ All routes loaded successfully');
 } catch (error) {
   logger.error('❌ Failed to load routes:', error);
   console.error('Route loading error:', error.message);
+  console.error('Stack:', error.stack);
   process.exit(1);
 }
 
@@ -126,11 +138,11 @@ const startServer = async () => {
     logger.info('🔄 Connecting to MongoDB...');
     await connectDB();
     logger.info('✅ MongoDB connected successfully');
-    
+
     // Start server
     const PORT = config.server.port;
     const HOST = config.server.host;
-    
+
     app.listen(PORT, HOST, () => {
       console.log('');
       console.log('═══════════════════════════════════════════════════════');
@@ -143,39 +155,27 @@ const startServer = async () => {
       console.log(`🎯 Frontend URL: ${config.server.frontendUrl}`);
       console.log('');
       console.log('📡 Available Endpoints:');
-      console.log('   ── SYSTEM ──');
-      console.log('   GET  /api/health              - Health check');
-      console.log('   GET  /api/status              - System status');
+      console.log('  ── SYSTEM ──');
+      console.log('   GET  /api/health - Health check');
+      console.log('   GET  /api/status - System status');
       console.log('');
-      console.log('   ── AUTHENTICATION (NEW!) ──');
-      console.log('   POST /api/auth/register       - Organizer signup');
-      console.log('   POST /api/auth/login          - User login');
-      console.log('   GET  /api/auth/me             - Get profile (protected)');
-      console.log('   PUT  /api/auth/update-profile - Update profile (protected)');
-      console.log('   PUT  /api/auth/change-password- Change password (protected)');
-      console.log('   POST /api/auth/logout         - Logout (protected)');
+      console.log('  ── ADMIN ──');
+      console.log('   GET  /api/admin/users - List all users');
+      console.log('   GET  /api/admin/photos - List all photos');
+      console.log('   GET  /api/admin/events - List all events');
+      console.log('   GET  /api/admin/stats - Dashboard stats');
       console.log('');
-      console.log('   ── EVENTS ──');
-      console.log('   POST /api/events              - Create event');
-      console.log('   GET  /api/events              - List events');
-      console.log('');
-      console.log('   ── GUESTS ──');
-      console.log('   POST /api/registrations       - Guest registration');
-      console.log('');
-      console.log('   ── PHOTOS ──');
-      console.log('   POST /api/photos/upload       - Upload photos');
-      console.log('   POST /api/face-matching       - Face matching');
+      console.log('  ── STATIC FILES ──');
+      console.log('   GET  /uploads/* - Uploaded images/files');
       console.log('═══════════════════════════════════════════════════════');
-      console.log('');
-      console.log('🎉 Phase 1 Complete: Authentication System Active!');
       console.log('');
       
       logger.info(`Server started on ${HOST}:${PORT}`);
     });
-    
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
     console.error('Startup error:', error.message);
+    console.error('Stack:', error.stack);
     process.exit(1);
   }
 };
@@ -206,8 +206,6 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-
-
 // ============================================
 // 12. START THE SERVER
 // ============================================
@@ -215,5 +213,3 @@ startServer();
 
 // Export app for testing
 module.exports = app;
-const photoRoutes = require('./routes/photos');
-app.use('/api/photos', photoRoutes);

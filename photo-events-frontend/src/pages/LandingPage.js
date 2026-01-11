@@ -109,6 +109,12 @@ const LandingPage = () => {
 
       {/* Hero Section */}
       <section className="hero-section">
+        <div className="hero-background">
+          <div className="hero-blob hero-blob-1"></div>
+          <div className="hero-blob hero-blob-2"></div>
+          <div className="hero-grid"></div>
+        </div>
+
         <div className="hero-container">
           <div className="hero-badge">
             <span className="badge-icon">✨</span>
@@ -311,6 +317,9 @@ const LandingPage = () => {
                   <li>✓ Automatic quality optimization</li>
                 </ul>
               </div>
+              <p className="social-text">
+                <strong>500+ event professionals</strong> trust PhotoManEa worldwide
+              </p>
             </div>
 
             {/* Feature 4 */}
@@ -340,6 +349,27 @@ const LandingPage = () => {
                   <li>✓ Export data and generate reports</li>
                 </ul>
               </div>
+
+              <div className="card-footer">
+                <button className="card-action-btn">
+                  <span>View Full Report</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Floating Elements */}
+            <div className="floating-element float-1">
+              <div className="float-icon">⚡</div>
+              <div className="float-text">Instant Processing</div>
+            </div>
+            <div className="floating-element float-2">
+              <div className="float-icon">🎯</div>
+              <div className="float-text">99.8% Accurate</div>
+            </div>
+            <div className="floating-element float-3">
+              <div className="float-icon">🚀</div>
+              <div className="float-text">Save 200h/event</div>
             </div>
           </div>
         </div>

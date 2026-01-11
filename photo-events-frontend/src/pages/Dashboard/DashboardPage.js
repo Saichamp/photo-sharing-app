@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { eventAPI } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import CreateEvent from './CreateEvent';
 import EventList from './EventList';
 import PhotoUpload from './PhotoUpload';
-import EventPhotoGallery from '../../components/dashboard/EventPhotoGallery'; // ✅ ADDED
+import EventPhotoGallery from '../../components/dashboard/EventPhotoGallery';
 import Analytics from './Analytics';
 import ProfilePage from './ProfilePage';
 import BillingPage from './BillingPage';
@@ -14,25 +14,22 @@ import './DashboardPage.css';
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
   
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showActivity, setShowActivity] = useState(false); // ✅ NEW: Toggle state
 
   // Load all events
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔄 Loading events...');
-      
       const response = await eventAPI.getAll();
       const eventsData = response.data?.data?.events || response.data?.events || [];
-      
       console.log('✅ Events loaded:', eventsData);
       setEvents(eventsData);
-      
     } catch (error) {
       console.error('❌ Failed to load events:', error);
       setEvents([]);
@@ -59,6 +56,25 @@ const DashboardPage = () => {
     setTimeout(() => navigate('/dashboard'), 300);
   }, [loadEvents, navigate]);
 
+  // ✅ NEW: Handle event update
+  const handleEventUpdate = useCallback((event) => {
+    console.log('✏️ Editing event:', event);
+    // Navigate to create page with event data (you can implement edit mode)
+    navigate('/dashboard/create', { state: { editEvent: event } });
+  }, [navigate]);
+
+  // ✅ NEW: Handle event delete
+  const handleEventDelete = useCallback(async (event) => {
+    try {
+      await eventAPI.delete(event._id || event.id);
+      console.log('🗑️ Event deleted:', event.name);
+      loadEvents();
+    } catch (error) {
+      console.error('❌ Failed to delete event:', error);
+      alert('Failed to delete event. Please try again.');
+    }
+  }, [loadEvents]);
+
   // Calculate stats
   const stats = {
     totalEvents: events.length,
@@ -69,11 +85,10 @@ const DashboardPage = () => {
     totalGuests: events.reduce((sum, e) => sum + (e.registrationCount || 0), 0)
   };
 
-  const isTabActive = (tab) => {
-    const path = location.pathname;
-    if (tab === 'events') return path === '/dashboard' || path === '/dashboard/';
-    return path.includes(tab);
-  };
+  // Get recent activity (last 5 events)
+  const recentActivity = events
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
 
   return (
     <div className="dashboard-container">
@@ -83,6 +98,17 @@ const DashboardPage = () => {
           <h1>Welcome back, {user?.name}! 👋</h1>
           <p>Manage your events and photos with AI-powered face recognition</p>
         </div>
+
+        {/* ✅ NEW: Activity Toggle Button */}
+        <button 
+          className="activity-toggle-btn"
+          onClick={() => setShowActivity(!showActivity)}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" />
+          </svg>
+          {showActivity ? 'Hide Activity' : 'Recent Activity'}
+        </button>
       </div>
 
       {loading ? (
@@ -99,7 +125,9 @@ const DashboardPage = () => {
               <div className="stat-info">
                 <h3>{stats.totalEvents}</h3>
                 <p>TOTAL EVENTS</p>
-                <span className="stat-detail">{stats.upcomingEvents}/{stats.totalEvents} used</span>
+                <span className="stat-detail">
+                  {stats.upcomingEvents}/{stats.totalEvents} upcoming
+                </span>
               </div>
             </div>
 
@@ -108,7 +136,7 @@ const DashboardPage = () => {
               <div className="stat-info">
                 <h3>{stats.totalPhotos}</h3>
                 <p>PHOTOS UPLOADED</p>
-                <span className="stat-detail">{stats.activeEvents} Active</span>
+                <span className="stat-detail">{stats.activeEvents} active events</span>
               </div>
             </div>
 
@@ -117,7 +145,7 @@ const DashboardPage = () => {
               <div className="stat-info">
                 <h3>{stats.totalGuests}</h3>
                 <p>REGISTERED GUESTS</p>
-                <span className="stat-detail">{stats.upcomingEvents} Upcoming</span>
+                <span className="stat-detail">{stats.upcomingEvents} upcoming</span>
               </div>
             </div>
 
@@ -131,38 +159,10 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="dashboard-content">
-            {/* Sidebar Tabs */}
-            <div className="dashboard-sidebar">
-              <Link
-                to="/dashboard"
-                className={`tab-link ${isTabActive('events') ? 'active' : ''}`}
-              >
-                📅 Events
-              </Link>
-              <Link
-                to="/dashboard/create"
-                className={`tab-link ${isTabActive('create') ? 'active' : ''}`}
-              >
-                ➕ Create Event
-              </Link>
-              <Link
-                to="/dashboard/upload"
-                className={`tab-link ${isTabActive('upload') ? 'active' : ''}`}
-              >
-                ⬆️ Upload Photos
-              </Link>
-              <Link
-                to="/dashboard/analytics"
-                className={`tab-link ${isTabActive('analytics') ? 'active' : ''}`}
-              >
-                📊 Analytics
-              </Link>
-            </div>
-
-            {/* Content Area */}
-            <div className="dashboard-main">
+          {/* Main Content with Sidebar */}
+          <div className="dashboard-content-wrapper">
+            {/* Main Content */}
+            <div className="dashboard-main-content">
               <Routes>
                 <Route
                   path="/"
@@ -170,35 +170,30 @@ const DashboardPage = () => {
                     <EventList
                       events={events}
                       onRefresh={handleDataChange}
+                      onEventUpdate={handleEventUpdate} // ✅ Pass handler
+                      onEventDelete={handleEventDelete} // ✅ Pass handler
                     />
                   }
                 />
                 <Route
                   path="/create"
-                  element={
-                    <CreateEvent
-                      onEventCreated={handleEventCreated}
-                    />
-                  }
+                  element={<CreateEvent onEventCreated={handleEventCreated} />}
                 />
                 <Route
                   path="/upload"
                   element={
                     <>
-                      {/* ✅ PHOTO UPLOAD SECTION */}
                       <PhotoUpload
                         events={events}
                         selectedEvent={selectedEvent}
                         onEventSelect={setSelectedEvent}
-                        onPhotosUploaded={handleDataChange} // ✅ Refresh on upload
+                        onPhotosUploaded={handleDataChange}
                       />
-                      
-                      {/* ✅ PHOTO GALLERY SECTION (NEW!) */}
                       {selectedEvent && (
-                        <div style={{ marginTop: '40px' }}>
-                          <EventPhotoGallery 
+                        <div style={{ marginTop: 40 }}>
+                          <EventPhotoGallery
                             event={selectedEvent}
-                            key={selectedEvent._id} // ✅ Force re-render on event change
+                            key={selectedEvent.id}
                           />
                         </div>
                       )}
@@ -207,17 +202,60 @@ const DashboardPage = () => {
                 />
                 <Route
                   path="/analytics"
-                  element={
-                    <Analytics
-                      events={events}
-                      onRefresh={handleDataChange}
-                    />
-                  }
+                  element={<Analytics events={events} onRefresh={handleDataChange} />}
                 />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/billing" element={<BillingPage />} />
               </Routes>
             </div>
+
+            {/* ✅ NEW: Collapsible Activity Sidebar */}
+            {showActivity && (
+              <div className="activity-sidebar">
+                <div className="activity-header">
+                  <h3>📊 Recent Activity</h3>
+                  <button 
+                    className="close-btn"
+                    onClick={() => setShowActivity(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="activity-list">
+                  {recentActivity.length > 0 ? (
+                    recentActivity.map((event) => (
+                      <div key={event._id} className="activity-item">
+                        <div className="activity-icon">
+                          {event.photosUploaded > 0 ? '📸' : '📅'}
+                        </div>
+                        <div className="activity-content">
+                          <p className="activity-title">
+                            {event.photosUploaded > 0
+                              ? `${event.photosUploaded} photos uploaded to`
+                              : `Event created:`}
+                          </p>
+                          <p className="activity-event">"{event.name}"</p>
+                          <p className="activity-date">
+                            {new Date(event.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="activity-empty">
+                      <p>No recent activity</p>
+                    </div>
+                  )}
+                </div>
+
+                {recentActivity.length > 0 && (
+                  <Link to="/dashboard/analytics" className="view-all-link">
+                    View All Analytics →
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

@@ -1,83 +1,64 @@
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
-  // NEW: User/Organizer who created the event
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Event must belong to a user'],
-    index: true // For fast queries by user
-  },
-  
   name: {
     type: String,
-    required: true,
-    trim: true
+    required: [true, 'Event name is required'],
+    trim: true,
+    maxlength: [100, 'Event name cannot exceed 100 characters']
   },
-  
-  date: {
-    type: Date,
-    required: true
-  },
-  
   description: {
     type: String,
-    default: ''
+    trim: true,
+    maxlength: [500, 'Description cannot exceed 500 characters']
   },
-  
-  // NEW: Location field
   location: {
     type: String,
-    default: 'Not specified'
+    required: [true, 'Event location is required'],
+    trim: true
   },
-  
-  expectedGuests: {
-    type: Number,
-    required: true,
-    min: 1
+  date: {
+    type: Date,
+    required: [true, 'Event date is required']
   },
-  
+  // ADD THIS FIELD
+  organizer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'Event organizer is required']
+  },
   qrCode: {
     type: String,
-    required: true,
     unique: true
   },
-  
   status: {
     type: String,
-    enum: ['upcoming', 'active', 'completed'],
-    default: 'upcoming'
+    enum: ['active', 'completed', 'cancelled', 'draft'],
+    default: 'active'
   },
-  
+  isPublic: {
+    type: Boolean,
+    default: true
+  },
+  maxGuests: {
+    type: Number,
+    default: null
+  },
+  // ✅ ADD THESE FIELDS TO TRACK COUNTS
   registrationCount: {
     type: Number,
     default: 0
   },
-  
   photosUploaded: {
     type: Number,
     default: 0
   },
-  
-  // NEW: Storage tracking
   storageUsed: {
     type: Number,
-    default: 0 // In bytes
+    default: 0
   },
-  
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  
-  organizerEmail: {
-    type: String,
-    required: true
-  },
-  
-  // NEW: Settings
   settings: {
-    allowGuestDownload: {
+    allowGuestRegistration: {
       type: Boolean,
       default: true
     },
@@ -85,9 +66,9 @@ const eventSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
-    maxPhotosPerGuest: {
-      type: Number,
-      default: 100
+    autoEmailPhotos: {
+      type: Boolean,
+      default: true
     }
   }
 }, {
@@ -96,96 +77,51 @@ const eventSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-/**
- * Indexes for Performance
- */
-eventSchema.index({ userId: 1, createdAt: -1 }); // User's events sorted by date
-eventSchema.index({ status: 1 }); // Filter by status
-eventSchema.index({ date: 1 }); // Sort by event date
-
-/**
- * Virtual: Get formatted date
- */
-eventSchema.virtual('formattedDate').get(function() {
-  return this.date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+// Generate unique QR code before saving
+eventSchema.pre('save', function(next) {
+  if (!this.qrCode) {
+    this.qrCode = `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+  next();
 });
 
-/**
- * Virtual: Get storage used in MB
- */
-eventSchema.virtual('storageUsedMB').get(function() {
-  return (this.storageUsed / (1024 * 1024)).toFixed(2);
-});
+// ✅ ADD THESE INSTANCE METHODS
+eventSchema.methods.incrementRegistration = async function() {
+  this.registrationCount = (this.registrationCount || 0) + 1;
+  await this.save();
+};
 
-/**
- * Virtual: Check if event is past
- */
+eventSchema.methods.decrementRegistration = async function() {
+  this.registrationCount = Math.max(0, (this.registrationCount || 0) - 1);
+  await this.save();
+};
+
+eventSchema.methods.incrementPhotoStats = async function(sizeInBytes, count = 1) {
+  this.photosUploaded = (this.photosUploaded || 0) + count;
+  this.storageUsed = (this.storageUsed || 0) + sizeInBytes;
+  await this.save();
+};
+
+eventSchema.methods.decrementPhotoStats = async function(sizeInBytes) {
+  this.photosUploaded = Math.max(0, (this.photosUploaded || 0) - 1);
+  this.storageUsed = Math.max(0, (this.storageUsed || 0) - sizeInBytes);
+  await this.save();
+};
+
+// Virtual for checking if event is in the past
 eventSchema.virtual('isPast').get(function() {
   return this.date < new Date();
 });
 
-/**
- * Instance Method: Increment registration count
- */
-eventSchema.methods.incrementRegistration = async function() {
-  this.registrationCount += 1;
-  await this.save();
-};
-
-/**
- * Instance Method: Increment photo count and storage
- */
-/**
- * Instance Method: Increment photo count and storage
- * ✅ FIXED: Now accepts count parameter
- */
-eventSchema.methods.incrementPhotoStats = async function(fileSize, count = 1) {
-  this.photosUploaded += count; // ✅ Add count, not just 1
-  this.storageUsed += fileSize;
-  await this.save();
-};
-
-
-/**
- * Instance Method: Update status based on date
- */
-eventSchema.methods.updateStatus = async function() {
-  const now = new Date();
-  const eventDate = new Date(this.date);
-  const dayAfterEvent = new Date(eventDate);
-  dayAfterEvent.setDate(dayAfterEvent.getDate() + 1);
-  
-  if (now < eventDate) {
-    this.status = 'upcoming';
-  } else if (now >= eventDate && now < dayAfterEvent) {
-    this.status = 'active';
-  } else {
-    this.status = 'completed';
-  }
-  
-  await this.save();
-};
-
-/**
- * Pre-save Middleware: Auto-update status
- */
-eventSchema.pre('save', function(next) {
-  const now = new Date();
-  const eventDate = new Date(this.date);
-  
-  if (now < eventDate) {
-    this.status = 'upcoming';
-  } else if (now.toDateString() === eventDate.toDateString()) {
-    this.status = 'active';
-  } else if (now > eventDate) {
-    this.status = 'completed';
-  }
-  
-  next();
+// Virtual for storage in MB
+eventSchema.virtual('storageUsedMB').get(function() {
+  return ((this.storageUsed || 0) / (1024 * 1024)).toFixed(2);
 });
+
+// Indexes for better query performance
+eventSchema.index({ organizer: 1, createdAt: -1 });
+eventSchema.index({ qrCode: 1 });
+eventSchema.index({ status: 1 });
+eventSchema.index({ date: 1 });
 
 module.exports = mongoose.model('Event', eventSchema);

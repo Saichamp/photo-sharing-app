@@ -1,10 +1,20 @@
 import React, { useState } from 'react';
 import './EventList.css';
 
-const EventList = ({ events = [], loading = false, selectedEvent, onEventSelect, onEventUpdate, onEventDelete }) => {
-  const [sortBy, setSortBy] = useState('date');
-  const [sortOrder, setSortOrder] = useState('desc');
+const EventList = ({ 
+  events = [], 
+  loading = false, 
+  selectedEvent, 
+  onEventSelect, 
+  onEventUpdate, 
+  onEventDelete 
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedEventDetails, setSelectedEventDetails] = useState(null);
+
+  console.log('EventList received events:', events);
 
   const getStatusConfig = (status) => {
     switch (status) {
@@ -19,101 +29,120 @@ const EventList = ({ events = [], loading = false, selectedEvent, onEventSelect,
     }
   };
 
-  const copyRegistrationLink = (qrCode, e) => {
-    e.stopPropagation();
-    const link = `${window.location.origin}/register/${qrCode}`;
-    navigator.clipboard.writeText(link);
-
-    // Show notification
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 24px;
-      right: 24px;
-      background: #10b981;
-      color: white;
-      padding: 16px 24px;
-      border-radius: 12px;
-      font-weight: 600;
-      z-index: 10000;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-      animation: slideIn 0.3s ease-out;
-    `;
-    notification.textContent = '✓ Registration link copied to clipboard!';
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-      notification.style.animation = 'slideOut 0.3s ease-in';
-      setTimeout(() => document.body.removeChild(notification), 300);
-    }, 2500);
-  };
-
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = date - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
 
-    if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays <= 7) return `In ${diffDays} days`;
-
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+  // ✅ Copy Registration Link
+  const copyRegistrationLink = (event, e) => {
+    e.stopPropagation();
+    const link = `${window.location.origin}/register/${event.qrCode}`;
+    
+    navigator.clipboard.writeText(link).then(() => {
+      // Show success notification
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        z-index: 10000;
+        box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
+        animation: slideInRight 0.3s ease-out;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      `;
+      notification.innerHTML = `
+        <span style="font-size: 20px;">✓</span>
+        <span>Registration link copied to clipboard!</span>
+      `;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.animation = 'slideOutRight 0.3s ease-in';
+        setTimeout(() => document.body.removeChild(notification), 300);
+      }, 3000);
+    }).catch(err => {
+      alert('Failed to copy link. Please try again.');
+      console.error('Copy failed:', err);
     });
   };
 
-  // Filter and sort events
-  const filteredEvents = events
-    .filter(event => filterStatus === 'all' || event.status === filterStatus)
-    .sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'date':
-          aValue = new Date(a.date);
-          bValue = new Date(b.date);
-          break;
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'registrations':
-          aValue = a.registrationCount || 0;
-          bValue = b.registrationCount || 0;
-          break;
-        case 'photos':
-          aValue = a.photosUploaded || 0;
-          bValue = b.photosUploaded || 0;
-          break;
-        default:
-          return 0;
-      }
+  // ✅ Show Event Details
+  const showEventDetails = (event, e) => {
+    e.stopPropagation();
+    setSelectedEventDetails(event);
+    setShowDetailsModal(true);
+  };
 
-      return sortOrder === 'asc' ? 
-        (aValue > bValue ? 1 : -1) : 
-        (aValue < bValue ? 1 : -1);
-    });
+  // Filter events
+  const filteredEvents = events.filter(event => {
+    const statusMatch = filterStatus === 'all' || event.status === filterStatus;
+    const searchMatch = !searchQuery || 
+      event.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    return statusMatch && searchMatch;
+  });
 
   if (loading && events.length === 0) {
     return (
-      <div className="event-list-loading">
-        <div className="spinner"></div>
-        <p>Loading events...</p>
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div className="spinner" style={{ 
+          width: '40px', 
+          height: '40px', 
+          border: '4px solid #f3f4f6',
+          borderTop: '4px solid #a855f7',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 20px'
+        }}></div>
+        <p style={{ color: '#64748b' }}>Loading events...</p>
       </div>
     );
   }
 
   if (!events || events.length === 0) {
     return (
-      <div className="event-list-empty">
-        <div className="empty-icon">📅</div>
-        <h3>No Events Yet</h3>
-        <p>Create your first event to get started with PhotoManEa</p>
-        <a href="/dashboard/create" className="btn btn-primary">
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '80px 20px',
+        background: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📅</div>
+        <h3 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '10px' }}>
+          No Events Yet
+        </h3>
+        <p style={{ color: '#64748b', marginBottom: '30px' }}>
+          Create your first event to get started with PhotoManEa!
+        </p>
+        <a 
+          href="/dashboard/create" 
+          style={{
+            display: 'inline-block',
+            padding: '14px 28px',
+            background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            fontWeight: '600',
+            textDecoration: 'none',
+            boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'
+          }}
+        >
           + Create Your First Event
         </a>
       </div>
@@ -121,133 +150,403 @@ const EventList = ({ events = [], loading = false, selectedEvent, onEventSelect,
   }
 
   return (
-    <div className="event-list-container">
-      {/* Header with Filters */}
-      <div className="event-list-header">
-        <div className="header-left">
-          <h2>My Events</h2>
-          <p className="subtitle">
+    <div style={{ padding: '20px' }}>
+      {/* Header */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '24px',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}>
+        <div>
+          <h2 style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+            📋 My Events ({filteredEvents.length})
+          </h2>
+          <p style={{ color: '#64748b', margin: '4px 0 0 0' }}>
             Showing {filteredEvents.length} of {events.length} events
           </p>
         </div>
 
-        <div className="header-right">
-          <select 
-            value={filterStatus} 
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {/* Search */}
+          <input
+            type="text"
+            placeholder="🔍 Search events..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              padding: '10px 16px',
+              border: '2px solid #e2e8f0',
+              borderRadius: '10px',
+              fontSize: '14px',
+              minWidth: '200px',
+              outline: 'none'
+            }}
+          />
+
+          {/* Filter */}
+          <select
+            value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="filter-select"
+            style={{
+              padding: '10px 16px',
+              border: '2px solid #e2e8f0',
+              borderRadius: '10px',
+              fontSize: '14px',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
           >
-            <option value="all">All Events ({events.length})</option>
-            <option value="upcoming">
-              Upcoming ({events.filter(e => e.status === 'upcoming').length})
-            </option>
-            <option value="active">
-              Active ({events.filter(e => e.status === 'active').length})
-            </option>
-            <option value="completed">
-              Completed ({events.filter(e => e.status === 'completed').length})
-            </option>
+            <option value="all">All Status</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
           </select>
-
-          <select 
-            value={sortBy} 
-            onChange={(e) => setSortBy(e.target.value)}
-            className="sort-select"
-          >
-            <option value="date">Date</option>
-            <option value="name">Name</option>
-            <option value="registrations">Registrations</option>
-            <option value="photos">Photos</option>
-          </select>
-
-          <button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="sort-toggle"
-            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-          >
-            {sortOrder === 'asc' ? '↑' : '↓'}
-          </button>
         </div>
       </div>
 
-      {/* Event Grid */}
-      <div className="event-grid">
-        {filteredEvents.map((event) => {
+      {/* Events Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: '20px'
+      }}>
+        {filteredEvents.map(event => {
           const statusConfig = getStatusConfig(event.status);
-          const isSelected = selectedEvent?._id === event._id;
-          
+
           return (
             <div
-              key={event._id}
-              className={`event-card ${isSelected ? 'selected' : ''}`}
-              onClick={() => onEventSelect && onEventSelect(event)}
+              key={event._id || event.id}
+              style={{
+                background: 'white',
+                borderRadius: '16px',
+                padding: '20px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                border: '1px solid #f1f5f9',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onClick={(e) => showEventDetails(event, e)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+              }}
             >
               {/* Status Badge */}
-              <div 
-                className="event-status"
-                style={{ 
-                  background: statusConfig.bg, 
-                  color: statusConfig.color 
-                }}
-              >
-                <span className="status-icon">{statusConfig.icon}</span>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: '600',
+                background: statusConfig.bg,
+                color: statusConfig.color,
+                marginBottom: '16px'
+              }}>
+                <span>{statusConfig.icon}</span>
                 {statusConfig.text}
               </div>
 
-              {/* Event Info */}
-              <div className="event-info">
-                <h3 className="event-title">{event.name}</h3>
-                <p className="event-date">
-                  <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" />
-                  </svg>
-                  {formatDate(event.date)}
+              {/* Event Name */}
+              <h3 style={{
+                fontSize: '20px',
+                fontWeight: '700',
+                color: '#1e293b',
+                margin: '0 0 12px 0'
+              }}>
+                {event.name}
+              </h3>
+
+              {/* Date */}
+              <p style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                color: '#64748b',
+                fontSize: '14px',
+                margin: '0 0 8px 0'
+              }}>
+                <span>📅</span>
+                {formatDate(event.date || event.eventDate)}
+              </p>
+
+              {/* Location */}
+              {event.location && (
+                <p style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  color: '#64748b',
+                  fontSize: '14px',
+                  margin: '0 0 16px 0'
+                }}>
+                  <span>📍</span>
+                  {event.location}
                 </p>
-                {event.description && (
-                  <p className="event-description">
-                    {event.description.length > 80 
-                      ? `${event.description.substring(0, 80)}...` 
-                      : event.description}
-                  </p>
-                )}
-              </div>
+              )}
 
               {/* Stats */}
-              <div className="event-stats">
-                <div className="stat-item">
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                  </svg>
-                  <span>{event.registrationCount || 0}</span>
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                paddingTop: '16px',
+                borderTop: '1px solid #f1f5f9',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>👥</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>
+                    {event.registrationCount || 0}
+                  </span>
                 </div>
-                <div className="stat-item">
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
-                  </svg>
-                  <span>{event.photosUploaded || 0}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📸</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600' }}>
+                    {event.photosUploaded || 0}
+                  </span>
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="event-actions">
+              {/* Action Buttons */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '8px',
+                marginBottom: '8px'
+              }}>
                 <button
-                  className="btn-action btn-primary"
-                  onClick={(e) => copyRegistrationLink(event.qrCode, e)}
-                  title="Copy registration link"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEventUpdate && onEventUpdate(event);
+                  }}
+                  style={{
+                    padding: '10px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
-                    <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM15 11h2a1 1 0 110 2h-2v-2z" />
-                  </svg>
-                  Copy Link
+                  ✏️ Edit
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Delete "${event.name}"?`)) {
+                      onEventDelete && onEventDelete(event);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗑️ Delete
                 </button>
               </div>
+
+              {/* ✅ COPY LINK BUTTON */}
+              <button
+                onClick={(e) => copyRegistrationLink(event, e)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span>🔗</span>
+                Copy Registration Link
+              </button>
             </div>
           );
         })}
       </div>
+
+      {/* No results */}
+      {filteredEvents.length === 0 && events.length > 0 && (
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <p style={{ color: '#64748b', fontSize: '16px' }}>
+            No events match your search criteria
+          </p>
+        </div>
+      )}
+
+      {/* ✅ EVENT DETAILS MODAL */}
+      {showDetailsModal && selectedEventDetails && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+          onClick={() => setShowDetailsModal(false)}
+        >
+          <div 
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '32px',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>
+                {selectedEventDetails.name}
+              </h2>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: '600',
+                background: getStatusConfig(selectedEventDetails.status).bg,
+                color: getStatusConfig(selectedEventDetails.status).color
+              }}>
+                <span>{getStatusConfig(selectedEventDetails.status).icon}</span>
+                {getStatusConfig(selectedEventDetails.status).text}
+              </div>
+            </div>
+
+            {/* Details */}
+            <div style={{ marginBottom: '24px' }}>
+              <DetailRow icon="📅" label="Date" value={formatDate(selectedEventDetails.date || selectedEventDetails.eventDate)} />
+              <DetailRow icon="📍" label="Location" value={selectedEventDetails.location || 'Not specified'} />
+              <DetailRow icon="📝" label="Description" value={selectedEventDetails.description || 'No description'} />
+              <DetailRow icon="👥" label="Registrations" value={`${selectedEventDetails.registrationCount || 0} guests`} />
+              <DetailRow icon="📸" label="Photos" value={`${selectedEventDetails.photosUploaded || 0} uploaded`} />
+              <DetailRow icon="🔗" label="QR Code" value={selectedEventDetails.qrCode} />
+            </div>
+
+            {/* Registration Link */}
+            <div style={{
+              background: '#f8fafc',
+              border: '2px dashed #cbd5e1',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '24px'
+            }}>
+              <p style={{ fontSize: '13px', fontWeight: '600', color: '#64748b', margin: '0 0 8px 0' }}>
+                Registration Link:
+              </p>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  value={`${window.location.origin}/register/${selectedEventDetails.qrCode}`}
+                  readOnly
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    background: 'white'
+                  }}
+                />
+                <button
+                  onClick={(e) => copyRegistrationLink(selectedEventDetails, e)}
+                  style={{
+                    padding: '10px 16px',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  📋 Copy
+                </button>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowDetailsModal(false)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+// ✅ Helper Component for Detail Rows
+const DetailRow = ({ icon, label, value }) => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    padding: '12px 0',
+    borderBottom: '1px solid #f1f5f9'
+  }}>
+    <span style={{ fontSize: '20px' }}>{icon}</span>
+    <div style={{ flex: 1 }}>
+      <p style={{ fontSize: '12px', fontWeight: '600', color: '#64748b', margin: '0 0 4px 0' }}>
+        {label}
+      </p>
+      <p style={{ fontSize: '14px', color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>
+        {value}
+      </p>
+    </div>
+  </div>
+);
 
 export default EventList;

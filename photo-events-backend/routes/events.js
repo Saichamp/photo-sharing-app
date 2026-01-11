@@ -46,7 +46,7 @@ router.get(
   '/:id',
   authenticate,
   validateObjectIdParam('id'),
-  verifyOwnership(Event, 'userId'),
+  verifyOwnership(Event),  // ✅ FIXED: No second parameter needed!
   eventController.getEventById
 );
 
@@ -59,7 +59,7 @@ router.put(
   '/:id',
   authenticate,
   validateObjectIdParam('id'),
-  verifyOwnership(Event, 'userId'),
+  verifyOwnership(Event),  // ✅ FIXED: No second parameter needed!
   eventController.updateEvent
 );
 
@@ -72,7 +72,7 @@ router.delete(
   '/:id',
   authenticate,
   validateObjectIdParam('id'),
-  verifyOwnership(Event, 'userId'),
+  verifyOwnership(Event),  // ✅ FIXED: No second parameter needed!
   eventController.deleteEvent
 );
 
@@ -85,7 +85,7 @@ router.get(
   '/:id/stats',
   authenticate,
   validateObjectIdParam('id'),
-  verifyOwnership(Event, 'userId'),
+  verifyOwnership(Event),  // ✅ FIXED: No second parameter needed!
   eventController.getEventStats
 );
 

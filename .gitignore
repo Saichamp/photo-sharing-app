@@ -1,0 +1,128 @@
+# ========================================
+# PHOTOMANEA - MASTER .GITIGNORE
+# ========================================
+
+# ============ NODE MODULES ============
+node_modules/
+*/node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# ============ ENVIRONMENT FILES ============
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env
+backend/.env
+frontend/.env
+
+# ============ BUILD & DIST ============
+build/
+dist/
+*/build/
+*/dist/
+frontend/build/
+backend/dist/
+
+# ============ LOGS ============
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+backend/logs/
+combined.log
+error.log
+exceptions.log
+
+# ============ UPLOADS & USER DATA ============
+uploads/
+backend/uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.mp4
+
+# ============ PYTHON ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+backend/venv/
+backend/env/
+*.egg-info/
+.pytest_cache/
+
+# ============ FACE RECOGNITION MODELS ============
+backend/models/
+*.onnx
+*.pkl
+*.pth
+*.h5
+.insightface/
+buffalo_l/
+
+# ============ DEPENDENCIES ============
+package-lock.json
+yarn.lock
+.pnp.*
+.yarn/
+
+# ============ TESTING ============
+coverage/
+.nyc_output
+*.lcov
+
+# ============ CACHE ============
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# ============ OS FILES ============
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============ IDE & EDITOR ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============ TEMP FILES ============
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# ============ DATABASE ============
+*.sqlite
+*.sqlite3
+*.db
+
+# ============ MISC ============
+.history/
+.git-credentials
+*.orig
