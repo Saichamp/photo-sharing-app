@@ -3,104 +3,111 @@ import { Link } from 'react-router-dom';
 import './LandingPage.css';
 
 const LandingPage = () => {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeFaq, setActiveFaq] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  // Handle navbar scroll effect
+  // Handle scroll for sticky nav
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
+      setIsScrolled(window.scrollY > 50);
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close mobile menu when resizing to desktop
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth > 768) {
-        setMobileMenuOpen(false);
-      }
-    };
+  // FAQ data
+  const faqs = [
+    {
+      question: "How accurate is the AI face recognition?",
+      answer: "Our AI achieves 99.8% accuracy using InsightFace technology. It can detect faces in various lighting conditions, angles, and even with accessories like glasses or hats. The system continuously learns and improves with each event."
+    },
+    {
+      question: "How long does photo processing take?",
+      answer: "Processing time depends on the number of photos, but typically 1,000 photos are processed in under 10 minutes. You'll receive real-time updates as the AI works through your event photos."
+    },
+    {
+      question: "Is my data secure and private?",
+      answer: "Absolutely. We use bank-level encryption (AES-256), are SOC2 compliant, and GDPR certified. All face data is encrypted and automatically deleted after 90 days. We never share or sell your data."
+    },
+    {
+      question: "Can I customize the email templates?",
+      answer: "Yes! You can fully customize email templates with your branding, colors, logo, and messaging. Templates support HTML and can be previewed before sending."
+    },
+    {
+      question: "What file formats do you support?",
+      answer: "We support all common image formats including JPG, PNG, HEIC, RAW (CR2, NEF, ARW), and even video formats like MP4 for future video recognition features."
+    },
+    {
+      question: "Do you offer a free trial?",
+      answer: "Yes! Get 14 days free with full access to all features. No credit card required. Process up to 500 photos during your trial period."
+    },
+    {
+      question: "How many photos can I upload?",
+      answer: "Our plans range from 1,000 photos/month (Starter) to unlimited (Enterprise). You can always upgrade mid-month if you need more capacity."
+    },
+    {
+      question: "What happens after my trial ends?",
+      answer: "You can choose a paid plan to continue, or your account will automatically convert to our free tier (100 photos/month). No data is deleted for 30 days, giving you time to decide."
+    }
+  ];
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const toggleFaq = (index) => {
+    setActiveFaq(activeFaq === index ? null : index);
+  };
 
   return (
     <div className="landing-page">
-      {/* Premium Navigation Header */}
-      <nav className={`nav-header ${scrolled ? 'scrolled' : ''}`}>
+      {/* Announcement Banner */}
+      <div className="announcement-banner">
+        <div className="announcement-content">
+          <span className="announcement-icon">🔔</span>
+          <span className="announcement-text">
+            New feature launched: Bulk video processing now available!
+          </span>
+          <Link to="/features" className="announcement-link">
+            Learn More →
+          </Link>
+        </div>
+      </div>
+
+      {/* Navigation Header */}
+      <nav className={`nav-header ${isScrolled ? 'scrolled' : ''}`}>
         <div className="nav-container">
           <div className="nav-brand">
             <span className="brand-icon">📸</span>
-            <span className="brand-name">PhotoManEa</span>
-            <span className="brand-badge">AI</span>
+            <span className="brand-name">PhotoEvents</span>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="nav-links">
-            <a href="#features" className="nav-link">Features</a>
-            <a href="#how-it-works" className="nav-link">How It Works</a>
-            <a href="#pricing" className="nav-link">Pricing</a>
-            <a href="#testimonials" className="nav-link">Testimonials</a>
-          </div>
-
-          <div className="nav-actions">
-            <Link to="/login" className="btn-nav-secondary">Login</Link>
-            <Link to="/register" className="btn-nav-primary">
-              <span className="btn-text">Start Free Trial</span>
-              <span className="btn-icon-arrow">→</span>
-            </Link>
-          </div>
-
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Toggle */}
           <button 
-            className="mobile-menu-btn"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="mobile-menu-toggle"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle menu"
           >
-            <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}>
+            <span className={`hamburger ${isMenuOpen ? 'active' : ''}`}>
               <span></span>
               <span></span>
               <span></span>
             </span>
           </button>
-        </div>
 
-        {/* Mobile Menu */}
-        <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
-          <div className="mobile-menu-content">
-            <a href="#features" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-              <span className="mobile-link-icon">✨</span>
-              Features
-            </a>
-            <a href="#how-it-works" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-              <span className="mobile-link-icon">⚙️</span>
-              How It Works
-            </a>
-            <a href="#pricing" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-              <span className="mobile-link-icon">💎</span>
-              Pricing
-            </a>
-            <a href="#testimonials" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-              <span className="mobile-link-icon">⭐</span>
-              Testimonials
-            </a>
-            <div className="mobile-menu-divider"></div>
-            <Link to="/login" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-              <span className="mobile-link-icon">🔐</span>
-              Login
-            </Link>
-            <Link to="/register" className="mobile-cta-btn">
-              Start Free Trial →
-            </Link>
+          {/* Navigation Links */}
+          <div className={`nav-links ${isMenuOpen ? 'mobile-open' : ''}`}>
+            <a href="#features" onClick={() => setIsMenuOpen(false)}>Features</a>
+            <a href="#how-it-works" onClick={() => setIsMenuOpen(false)}>How It Works</a>
+            <a href="#pricing" onClick={() => setIsMenuOpen(false)}>Pricing</a>
+            <a href="#faq" onClick={() => setIsMenuOpen(false)}>FAQ</a>
+          </div>
+
+          <div className="nav-actions">
+            <Link to="/login" className="btn-nav-secondary">Login</Link>
+            <Link to="/register" className="btn-nav-primary">Start Free Trial</Link>
           </div>
         </div>
       </nav>
 
-      {/* Premium Hero Section */}
+      {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-background">
           <div className="hero-blob hero-blob-1"></div>
@@ -109,119 +116,238 @@ const LandingPage = () => {
         </div>
 
         <div className="hero-container">
-          <div className="hero-content">
-            <div className="hero-badge animate-fade-in">
-              <span className="badge-icon">✨</span>
-              <span className="badge-text">AI-Powered Event Photography Platform</span>
+          <div className="hero-badge">
+            <span className="badge-icon">✨</span>
+            AI-Powered Event Photography Platform
+          </div>
+          
+          <h1 className="hero-title">
+            Automate Event Photo Delivery
+            <span className="title-gradient"> with Intelligence</span>
+          </h1>
+          
+          <p className="hero-subtitle">
+            Stop manually sorting thousands of photos. Our AI finds and delivers 
+            the perfect shots to every guest automatically. Save 200+ hours per event.
+          </p>
+
+          <div className="hero-actions">
+            <Link to="/register" className="btn-hero-primary">
+              <span className="btn-icon">🚀</span>
+              Start Free Trial
+            </Link>
+            <button className="btn-hero-secondary">
+              <span className="btn-icon">▶️</span>
+              Watch Demo
+            </button>
+          </div>
+
+         
+        </div>
+      </section>
+
+      {/* Stats Banner }
+      <section className="stats-section">
+        <div className="stats-container">
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon">🎯</div>
+              <div className="stat-number">99.8%</div>
+              <div className="stat-label">AI Accuracy</div>
             </div>
-            
-            <h1 className="hero-title animate-slide-up">
-              Automate Event Photo Delivery 
-              <span className="title-gradient"> with AI Intelligence</span>
-            </h1>
-            
-            <p className="hero-subtitle animate-slide-up delay-1">
-              Stop manually sorting thousands of photos. Our AI finds and delivers 
-              the perfect shots to every guest automatically. 
-              <strong>Save 200+ hours per event.</strong>
+            <div className="stat-card">
+              <div className="stat-icon">📸</div>
+              <div className="stat-number">10K+</div>
+              <div className="stat-label">Photos Processed</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">🎉</div>
+              <div className="stat-number">500+</div>
+              <div className="stat-label">Events Powered</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">⚡</div>
+              <div className="stat-number">80%</div>
+              <div className="stat-label">Time Saved</div>
+            </div>
+          </div>
+
+          <div className="logo-carousel">
+            <p className="carousel-title">Trusted by leading event companies</p>
+            <div className="logo-track">
+              <div className="logo-item">Marriott Events</div>
+              <div className="logo-item">Eventbrite</div>
+              <div className="logo-item">WedPro Studio</div>
+              <div className="logo-item">Corporate Plus</div>
+              <div className="logo-item">Elite Weddings</div>
+              <div className="logo-item">Photo Masters</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Problem-Solution Section */}
+      <section className="problem-solution-section">
+        <div className="problem-solution-container">
+          <div className="problem-card">
+            <div className="card-icon error">❌</div>
+            <h3 className="card-title">The Problem</h3>
+            <p className="card-description">
+              Event organizers spend 200+ hours manually sorting and sending photos. 
+              Guests wait weeks for their pictures. Many photos never get delivered 
+              to the right people.
             </p>
+            <ul className="card-list">
+              <li>Manual photo sorting is exhausting</li>
+              <li>Guests get frustrated waiting</li>
+              <li>Many photos get lost or misplaced</li>
+              <li>Follow-up emails are time-consuming</li>
+            </ul>
+          </div>
 
-            <div className="hero-stats animate-slide-up delay-2">
-              <div className="stat-item">
-                <span className="stat-number">99.8%</span>
-                <span className="stat-label">AI Accuracy</span>
+          <div className="solution-card">
+            <div className="card-icon success">✅</div>
+            <h3 className="card-title">Our Solution</h3>
+            <p className="card-description">
+              AI automatically identifies every person in every photo and delivers 
+              personalized collections instantly. Save time, delight guests, and 
+              never lose a photo again.
+            </p>
+            <ul className="card-list">
+              <li>AI processes 1000+ photos in 10 minutes</li>
+              <li>Instant delivery to all guests</li>
+              <li>99.8% accurate face matching</li>
+              <li>Zero manual work required</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="features-section" id="features">
+        <div className="features-container">
+          <div className="section-header">
+            <h2 className="section-title">Everything you need for automated photo delivery</h2>
+            <p className="section-subtitle">
+              Professional tools designed for event organizers who value efficiency
+            </p>
+          </div>
+
+          <div className="feature-showcase">
+            {/* Feature 1 */}
+            <div className="feature-row">
+              <div className="feature-visual">
+                <div className="visual-placeholder ai-visual">
+                  <span className="visual-icon">🤖</span>
+                  <div className="visual-animation">
+                    <div className="face-box"></div>
+                    <div className="face-box"></div>
+                    <div className="face-box"></div>
+                  </div>
+                </div>
               </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <span className="stat-number">80%</span>
-                <span className="stat-label">Time Saved</span>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <span className="stat-number">10K+</span>
-                <span className="stat-label">Photos/Day</span>
+              <div className="feature-content">
+                <div className="feature-badge">AI Powered</div>
+                <h3 className="feature-title">Advanced Face Recognition</h3>
+                <p className="feature-description">
+                  Our AI uses InsightFace technology to achieve 99.8% accuracy. It detects 
+                  faces in any lighting, angle, or condition—even with glasses, masks, or hats.
+                </p>
+                <ul className="feature-list">
+                  <li>✓ Multi-face detection in group photos</li>
+                  <li>✓ Works in low light and challenging conditions</li>
+                  <li>✓ Recognizes faces from different angles</li>
+                  <li>✓ Privacy-focused with encrypted data</li>
+                </ul>
               </div>
             </div>
 
-            <div className="hero-actions animate-slide-up delay-3">
-              <Link to="/register" className="btn-hero-primary">
-                <span className="btn-icon">🚀</span>
-                <span className="btn-content">
-                  <span className="btn-text">Start Free Trial</span>
-                  <span className="btn-subtext">No credit card required</span>
-                </span>
-              </Link>
-              <button className="btn-hero-secondary">
-                <span className="btn-icon">▶️</span>
-                <span className="btn-text">Watch Demo</span>
-              </button>
+            {/* Feature 2 */}
+            <div className="feature-row reverse">
+              <div className="feature-visual">
+                <div className="visual-placeholder email-visual">
+                  <span className="visual-icon">📧</span>
+                  <div className="email-animation">
+                    <div className="email-card">
+                      <div className="email-header"></div>
+                      <div className="email-body"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="feature-content">
+                <div className="feature-badge">Automated</div>
+                <h3 className="feature-title">Intelligent Email Delivery</h3>
+                <p className="feature-description">
+                  Personalized photo collections are automatically sent to each guest with 
+                  your custom branding. Schedule deliveries or send instantly.
+                </p>
+                <ul className="feature-list">
+                  <li>✓ Custom email templates with your branding</li>
+                  <li>✓ Schedule delivery for optimal timing</li>
+                  <li>✓ Track open rates and downloads</li>
+                  <li>✓ Automatic follow-up reminders</li>
+                </ul>
+              </div>
             </div>
 
-            <div className="social-proof animate-fade-in delay-4">
-              <div className="trust-avatars">
-                <div className="avatar">👨‍💼</div>
-                <div className="avatar">👩‍💼</div>
-                <div className="avatar">👨‍🎨</div>
-                <div className="avatar">👩‍🎓</div>
-                <div className="avatar-count">+500</div>
+            {/* Feature 3 */}
+            <div className="feature-row">
+              <div className="feature-visual">
+                <div className="visual-placeholder speed-visual">
+                  <span className="visual-icon">⚡</span>
+                  <div className="progress-bars">
+                    <div className="progress-bar"></div>
+                    <div className="progress-bar"></div>
+                    <div className="progress-bar"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="feature-content">
+                <div className="feature-badge">Ultra Fast</div>
+                <h3 className="feature-title">Bulk Processing Power</h3>
+                <p className="feature-description">
+                  Upload and process 10,000+ photos in minutes, not hours. Our cloud 
+                  infrastructure scales automatically to handle events of any size.
+                </p>
+                <ul className="feature-list">
+                  <li>✓ Process 1,000 photos in under 10 minutes</li>
+                  <li>✓ Unlimited concurrent uploads</li>
+                  <li>✓ Real-time progress tracking</li>
+                  <li>✓ Automatic quality optimization</li>
+                </ul>
               </div>
               <p className="social-text">
                 <strong>500+ event professionals</strong> trust PhotoManEa worldwide
               </p>
             </div>
-          </div>
 
-          <div className="hero-visual animate-fade-in delay-2">
-            <div className="visual-card">
-              <div className="card-header">
-                <div className="card-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+            {/* Feature 4 */}
+            <div className="feature-row reverse">
+              <div className="feature-visual">
+                <div className="visual-placeholder dashboard-visual">
+                  <span className="visual-icon">📊</span>
+                  <div className="dashboard-grid">
+                    <div className="dashboard-card"></div>
+                    <div className="dashboard-card"></div>
+                    <div className="dashboard-card"></div>
+                    <div className="dashboard-card"></div>
+                  </div>
                 </div>
-                <span className="card-title">📊 Live Dashboard</span>
               </div>
-              
-              <div className="card-content">
-                <div className="demo-item processing">
-                  <span className="demo-icon">📸</span>
-                  <div className="demo-details">
-                    <span className="demo-text">1,247 photos uploaded</span>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{width: '100%'}}></div>
-                    </div>
-                  </div>
-                  <span className="demo-status success">✓</span>
-                </div>
-
-                <div className="demo-item">
-                  <span className="demo-icon">🤖</span>
-                  <div className="demo-details">
-                    <span className="demo-text">AI face matching</span>
-                    <div className="progress-bar">
-                      <div className="progress-fill active" style={{width: '73%'}}></div>
-                    </div>
-                  </div>
-                  <span className="demo-status">73%</span>
-                </div>
-
-                <div className="demo-item">
-                  <span className="demo-icon">✉️</span>
-                  <div className="demo-details">
-                    <span className="demo-text">Auto-delivery queue</span>
-                    <span className="demo-subtext">156 guests pending</span>
-                  </div>
-                  <span className="demo-status pending">⏳</span>
-                </div>
-
-                <div className="demo-item">
-                  <span className="demo-icon">📊</span>
-                  <div className="demo-details">
-                    <span className="demo-text">Match confidence</span>
-                    <span className="demo-subtext">Excellent accuracy</span>
-                  </div>
-                  <span className="demo-status success">99.8%</span>
-                </div>
+              <div className="feature-content">
+                <div className="feature-badge">Professional</div>
+                <h3 className="feature-title">Complete Event Dashboard</h3>
+                <p className="feature-description">
+                  Manage all your events from one beautiful dashboard. Get insights, 
+                  track metrics, and collaborate with your team in real-time.
+                </p>
+                <ul className="feature-list">
+                  <li>✓ Real-time analytics and reporting</li>
+                  <li>✓ Team collaboration tools</li>
+                  <li>✓ Guest management system</li>
+                  <li>✓ Export data and generate reports</li>
+                </ul>
               </div>
 
               <div className="card-footer">
@@ -249,315 +375,131 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="features-section" id="features">
-        <div className="features-container">
-          <div className="section-header">
-            <div className="section-badge">
-              <span className="badge-sparkle">✨</span>
-              POWERFUL FEATURES
-            </div>
-            <h2 className="section-title">Everything you need for automated photo delivery</h2>
-            <p className="section-subtitle">
-              Professional tools designed for event organizers who value efficiency and results
+  {/* How It Works */}
+<section className="how-it-works-section" id="how-it-works">
+  <div className="how-it-works-container">
+    <h2 className="section-title">How PhotoEvents Works</h2>
+    <p className="section-subtitle">Simple 5-step process from upload to delivery</p>
+
+    <div className="timeline">
+      <div className="timeline-item">
+        <div className="timeline-content">
+          <div className="timeline-marker">1</div>
+          <div className="timeline-icon">📤</div>
+          <div className="timeline-text">
+            <h3 className="timeline-title">Upload Photos</h3>
+            <p className="timeline-description">
+              Drag and drop all your event photos. Supports bulk upload of thousands of images at once.
             </p>
           </div>
-
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <div className="feature-icon">🤖</div>
-                <div className="feature-glow"></div>
-              </div>
-              <h3 className="feature-title">AI Face Recognition</h3>
-              <p className="feature-description">
-                99.8% accurate facial matching across thousands of photos using advanced deep learning algorithms
-              </p>
-              <div className="feature-metrics">
-                <span className="metric">
-                  <span className="metric-icon">⚡</span>
-                  Instant processing
-                </span>
-                <span className="metric">
-                  <span className="metric-icon">🎯</span>
-                  Precision matching
-                </span>
-              </div>
-              <div className="feature-link">
-                Learn more <span>→</span>
-              </div>
-            </div>
-
-            <div className="feature-card featured">
-              <div className="featured-badge">MOST POPULAR</div>
-              <div className="feature-icon-wrapper">
-                <div className="feature-icon">📧</div>
-                <div className="feature-glow"></div>
-              </div>
-              <h3 className="feature-title">Automated Delivery</h3>
-              <p className="feature-description">
-                Send personalized photo collections directly to guests' emails automatically with customizable templates
-              </p>
-              <div className="feature-metrics">
-                <span className="metric">
-                  <span className="metric-icon">📱</span>
-                  Mobile optimized
-                </span>
-                <span className="metric">
-                  <span className="metric-icon">🔒</span>
-                  Secure delivery
-                </span>
-              </div>
-              <div className="feature-link">
-                Learn more <span>→</span>
-              </div>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <div className="feature-icon">⚡</div>
-                <div className="feature-glow"></div>
-              </div>
-              <h3 className="feature-title">Bulk Processing</h3>
-              <p className="feature-description">
-                Process 10,000+ photos in minutes, not hours. Scale without limits with cloud infrastructure
-              </p>
-              <div className="feature-metrics">
-                <span className="metric">
-                  <span className="metric-icon">🚀</span>
-                  Ultra fast
-                </span>
-                <span className="metric">
-                  <span className="metric-icon">📊</span>
-                  Real-time analytics
-                </span>
-              </div>
-              <div className="feature-link">
-                Learn more <span>→</span>
-              </div>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <div className="feature-icon">📊</div>
-                <div className="feature-glow"></div>
-              </div>
-              <h3 className="feature-title">Professional Dashboard</h3>
-              <p className="feature-description">
-                Complete event management with analytics, reporting, and team collaboration in one place
-              </p>
-              <div className="feature-metrics">
-                <span className="metric">
-                  <span className="metric-icon">👥</span>
-                  Team access
-                </span>
-                <span className="metric">
-                  <span className="metric-icon">📈</span>
-                  Detailed insights
-                </span>
-              </div>
-              <div className="feature-link">
-                Learn more <span>→</span>
-              </div>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <div className="feature-icon">🎨</div>
-                <div className="feature-glow"></div>
-              </div>
-              <h3 className="feature-title">Custom Branding</h3>
-              <p className="feature-description">
-                White-label galleries with your logo, colors, and custom domain for professional presentation
-              </p>
-              <div className="feature-metrics">
-                <span className="metric">
-                  <span className="metric-icon">🎨</span>
-                  Brand colors
-                </span>
-                <span className="metric">
-                  <span className="metric-icon">🌐</span>
-                  Custom domain
-                </span>
-              </div>
-              <div className="feature-link">
-                Learn more <span>→</span>
-              </div>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon-wrapper">
-                <div className="feature-icon">🔐</div>
-                <div className="feature-glow"></div>
-              </div>
-              <h3 className="feature-title">Enterprise Security</h3>
-              <p className="feature-description">
-                Bank-level encryption, GDPR compliant, secure cloud storage with automated backups
-              </p>
-              <div className="feature-metrics">
-                <span className="metric">
-                  <span className="metric-icon">🛡️</span>
-                  SSL encrypted
-                </span>
-                <span className="metric">
-                  <span className="metric-icon">✅</span>
-                  GDPR compliant
-                </span>
-              </div>
-              <div className="feature-link">
-                Learn more <span>→</span>
-              </div>
-            </div>
-          </div>
         </div>
-      </section>
+      </div>
 
-      {/* How It Works */}
-      <section className="workflow-section" id="how-it-works">
-        <div className="workflow-background">
-          <div className="workflow-blob"></div>
-        </div>
-
-        <div className="workflow-container">
-          <div className="section-header">
-            <div className="section-badge">
-              <span className="badge-sparkle">⚙️</span>
-              HOW IT WORKS
-            </div>
-            <h2 className="workflow-title">Three simple steps to photo delivery perfection</h2>
-            <p className="workflow-subtitle">
-              From upload to guest inbox in minutes, not days
+      <div className="timeline-item">
+        <div className="timeline-content">
+          <div className="timeline-marker">2</div>
+          <div className="timeline-icon">🎯</div>
+          <div className="timeline-text">
+            <h3 className="timeline-title">AI Detection</h3>
+            <p className="timeline-description">
+              Our AI scans every photo and detects all faces with 99.8% accuracy in under 10 minutes.
             </p>
           </div>
+        </div>
+      </div>
 
-          <div className="workflow-steps">
-            <div className="workflow-step">
-              <div className="step-visual">
-                <div className="step-number">1</div>
-                <div className="step-icon">📤</div>
-              </div>
-              <div className="step-content">
-                <h3 className="step-title">Upload Photos</h3>
-                <p className="step-description">
-                  Drag and drop your event photos. Bulk upload thousands at once with our fast cloud infrastructure.
-                </p>
-                <ul className="step-features">
-                  <li>✓ Bulk upload (10,000+ photos)</li>
-                  <li>✓ Automatic organization</li>
-                  <li>✓ Duplicate detection</li>
-                </ul>
-              </div>
-              <div className="step-connector"></div>
-            </div>
-
-            <div className="workflow-step">
-              <div className="step-visual">
-                <div className="step-number">2</div>
-                <div className="step-icon">🤖</div>
-              </div>
-              <div className="step-content">
-                <h3 className="step-title">AI Matches Faces</h3>
-                <p className="step-description">
-                  Our AI identifies and matches every person across all photos with 99.8% accuracy using deep learning.
-                </p>
-                <ul className="step-features">
-                  <li>✓ 99.8% accuracy rate</li>
-                  <li>✓ Real-time processing</li>
-                  <li>✓ Manual review option</li>
-                </ul>
-              </div>
-              <div className="step-connector"></div>
-            </div>
-
-            <div className="workflow-step">
-              <div className="step-visual">
-                <div className="step-number">3</div>
-                <div className="step-icon">✉️</div>
-              </div>
-              <div className="step-content">
-                <h3 className="step-title">Auto Delivery</h3>
-                <p className="step-description">
-                  Guests receive their personalized photo collections via email with beautiful galleries and download options.
-                </p>
-                <ul className="step-features">
-                  <li>✓ Automated emails</li>
-                  <li>✓ Custom templates</li>
-                  <li>✓ Download tracking</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="workflow-cta">
-            <Link to="/register" className="workflow-cta-btn">
-              Try it free for 14 days
-              <span className="btn-arrow">→</span>
-            </Link>
-            <p className="workflow-cta-note">No credit card required • Setup in 5 minutes</p>
+      <div className="timeline-item">
+        <div className="timeline-content">
+          <div className="timeline-marker">3</div>
+          <div className="timeline-icon">🤖</div>
+          <div className="timeline-text">
+            <h3 className="timeline-title">Smart Matching</h3>
+            <p className="timeline-description">
+              AI matches faces across all photos and groups them by person automatically.
+            </p>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Social Proof / Testimonials */}
-      <section className="testimonials-section" id="testimonials">
+      <div className="timeline-item">
+        <div className="timeline-content">
+          <div className="timeline-marker">4</div>
+          <div className="timeline-icon">📧</div>
+          <div className="timeline-text">
+            <h3 className="timeline-title">Automated Delivery</h3>
+            <p className="timeline-description">
+              Personalized photo collections are automatically sent via email with your branding.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="timeline-item">
+        <div className="timeline-content">
+          <div className="timeline-marker">5</div>
+          <div className="timeline-icon">😊</div>
+          <div className="timeline-text">
+            <h3 className="timeline-title">Happy Guests</h3>
+            <p className="timeline-description">
+              Guests receive instant access to their photos. Download, share, or order prints easily.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+      {/* Testimonials */}
+      <section className="testimonials-section">
         <div className="testimonials-container">
-          <div className="section-header">
-            <div className="section-badge">
-              <span className="badge-sparkle">⭐</span>
-              TESTIMONIALS
-            </div>
-            <h2 className="section-title">Loved by event professionals worldwide</h2>
-            <p className="section-subtitle">
-              See what our customers say about PhotoManEa
-            </p>
-          </div>
+          <h2 className="section-title">Loved by Event Professionals</h2>
+          <p className="section-subtitle">See what our customers say about PhotoEvents</p>
 
           <div className="testimonials-grid">
             <div className="testimonial-card">
-              <div className="testimonial-rating">
-                ⭐⭐⭐⭐⭐
-              </div>
+              <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
               <p className="testimonial-text">
-                "PhotoManEa saved us over 150 hours on our last corporate event. The AI accuracy is incredible!"
+                "PhotoEvents transformed our wedding business. We used to spend 40+ hours 
+                sorting photos. Now it's done in 10 minutes. Our clients are thrilled with 
+                the instant delivery!"
               </p>
               <div className="testimonial-author">
-                <div className="author-avatar">👨‍💼</div>
-                <div className="author-details">
-                  <div className="author-name">Michael Chen</div>
-                  <div className="author-role">Event Manager, TechCorp</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="testimonial-card featured">
-              <div className="testimonial-badge">TOP REVIEW</div>
-              <div className="testimonial-rating">
-                ⭐⭐⭐⭐⭐
-              </div>
-              <p className="testimonial-text">
-                "Absolutely game-changing! Our clients are amazed at how quickly they receive their photos. ROI was immediate."
-              </p>
-              <div className="testimonial-author">
-                <div className="author-avatar">👩‍💼</div>
-                <div className="author-details">
+                <div className="author-avatar">SJ</div>
+                <div className="author-info">
                   <div className="author-name">Sarah Johnson</div>
-                  <div className="author-role">Wedding Photographer</div>
+                  <div className="author-title">Wedding Planner, WedPro Studio</div>
                 </div>
               </div>
             </div>
 
             <div className="testimonial-card">
-              <div className="testimonial-rating">
-                ⭐⭐⭐⭐⭐
-              </div>
+              <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
               <p className="testimonial-text">
-                "The automated delivery feature alone is worth 10x the price. Our team efficiency increased by 80%."
+                "The AI accuracy is incredible. It finds faces even in challenging lighting 
+                and crowded group shots. Our corporate clients love the professional 
+                dashboard and branded emails."
               </p>
               <div className="testimonial-author">
-                <div className="author-avatar">👨‍🎨</div>
-                <div className="author-details">
-                  <div className="author-name">David Martinez</div>
-                  <div className="author-role">Studio Owner</div>
+                <div className="author-avatar">MR</div>
+                <div className="author-info">
+                  <div className="author-name">Mike Rodriguez</div>
+                  <div className="author-title">Event Director, Marriott Events</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="testimonial-rating">⭐⭐⭐⭐⭐</div>
+              <p className="testimonial-text">
+                "Best investment we made this year. ROI in the first month! The time saved 
+                allows us to take on more events. Support team is amazing too."
+              </p>
+              <div className="testimonial-author">
+                <div className="author-avatar">DC</div>
+                <div className="author-info">
+                  <div className="author-name">David Chen</div>
+                  <div className="author-title">CEO, EventBrite Pro</div>
                 </div>
               </div>
             </div>
@@ -565,117 +507,215 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="cta-background">
-          <div className="cta-blob cta-blob-1"></div>
-          <div className="cta-blob cta-blob-2"></div>
-        </div>
+      {/* FAQ Section */}
+      <section className="faq-section" id="faq">
+        <div className="faq-container">
+          <h2 className="section-title">Frequently Asked Questions</h2>
+          <p className="section-subtitle">Everything you need to know about PhotoEvents</p>
 
-        <div className="cta-container">
-          <div className="cta-content">
-            <h2 className="cta-title">Ready to transform your event photography?</h2>
-            <p className="cta-subtitle">
-              Join 500+ event professionals already saving 200+ hours per event with PhotoManEa
-            </p>
-            
-            <div className="cta-features">
-              <div className="cta-feature">
-                <span className="cta-feature-icon">✓</span>
-                <span>14-day free trial</span>
+          <div className="faq-list">
+            {faqs.map((faq, index) => (
+              <div 
+                key={index} 
+                className={`faq-item ${activeFaq === index ? 'active' : ''}`}
+              >
+                <button 
+                  className="faq-question"
+                  onClick={() => toggleFaq(index)}
+                  aria-expanded={activeFaq === index}
+                >
+                  <span>{faq.question}</span>
+                  <span className="faq-icon">{activeFaq === index ? '−' : '+'}</span>
+                </button>
+                <div className="faq-answer">
+                  <p>{faq.answer}</p>
+                </div>
               </div>
-              <div className="cta-feature">
-                <span className="cta-feature-icon">✓</span>
-                <span>No credit card required</span>
-              </div>
-              <div className="cta-feature">
-                <span className="cta-feature-icon">✓</span>
-                <span>Cancel anytime</span>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            <div className="cta-actions">
-              <Link to="/register" className="btn-cta-primary">
-                <span className="btn-icon">🚀</span>
-                <span>Start Free Trial</span>
-              </Link>
-              <Link to="/dashboard" className="btn-cta-secondary">
-                <span className="btn-icon">📊</span>
-                <span>View Demo Dashboard</span>
-              </Link>
-            </div>
-
-            <p className="cta-guarantee">
-              💯 30-day money-back guarantee • 🔒 Secure SSL encryption
-            </p>
+          <div className="faq-cta">
+            <p>Still have questions?</p>
+            <Link to="/contact" className="btn-faq-contact">Contact Support →</Link>
           </div>
         </div>
       </section>
 
-      {/* Premium Footer */}
-      <footer className="footer">
-        <div className="footer-container">
-          <div className="footer-top">
-            <div className="footer-brand-section">
-              <div className="footer-brand">
-                <span className="brand-icon">📸</span>
-                <span className="brand-name">PhotoManEa</span>
+      {/* Pricing Preview */}
+      <section className="pricing-section" id="pricing">
+        <div className="pricing-container">
+          <h2 className="section-title">Simple, Transparent Pricing</h2>
+          <p className="section-subtitle">Choose the plan that fits your needs</p>
+
+          <div className="pricing-grid">
+            <div className="pricing-card">
+              <div className="pricing-header">
+                <h3 className="pricing-title">Starter</h3>
+                <div className="pricing-price">
+                  <span className="price-currency">$</span>
+                  <span className="price-amount">49</span>
+                  <span className="price-period">/month</span>
+                </div>
               </div>
-              <p className="footer-tagline">
-                AI-powered event photo delivery platform trusted by 500+ professionals worldwide.
-              </p>
-              <div className="footer-social">
-                <a href="#twitter" className="social-icon" aria-label="Twitter">🐦</a>
-                <a href="#facebook" className="social-icon" aria-label="Facebook">📘</a>
-                <a href="#instagram" className="social-icon" aria-label="Instagram">📷</a>
-                <a href="#linkedin" className="social-icon" aria-label="LinkedIn">💼</a>
-              </div>
+              <ul className="pricing-features">
+                <li>✓ 1,000 photos per month</li>
+                <li>✓ AI face recognition</li>
+                <li>✓ Automated email delivery</li>
+                <li>✓ Basic analytics</li>
+                <li>✓ Email support</li>
+              </ul>
+              <Link to="/register?plan=starter" className="btn-pricing">
+                Start Free Trial
+              </Link>
             </div>
 
-            <div className="footer-links-section">
-              <div className="footer-column">
-                <h4 className="footer-column-title">Product</h4>
-                <a href="#features" className="footer-link">Features</a>
-                <a href="#pricing" className="footer-link">Pricing</a>
-                <a href="#api" className="footer-link">API</a>
-                <a href="#integrations" className="footer-link">Integrations</a>
+            <div className="pricing-card featured">
+              <div className="pricing-badge">Most Popular</div>
+              <div className="pricing-header">
+                <h3 className="pricing-title">Pro</h3>
+                <div className="pricing-price">
+                  <span className="price-currency">$</span>
+                  <span className="price-amount">99</span>
+                  <span className="price-period">/month</span>
+                </div>
               </div>
+              <ul className="pricing-features">
+                <li>✓ 5,000 photos per month</li>
+                <li>✓ Advanced AI matching</li>
+                <li>✓ Custom email templates</li>
+                <li>✓ Advanced analytics</li>
+                <li>✓ Priority support</li>
+                <li>✓ Team collaboration</li>
+              </ul>
+              <Link to="/register?plan=pro" className="btn-pricing primary">
+                Start Free Trial
+              </Link>
+            </div>
 
-              <div className="footer-column">
-                <h4 className="footer-column-title">Company</h4>
-                <a href="#about" className="footer-link">About Us</a>
-                <a href="#blog" className="footer-link">Blog</a>
-                <a href="#careers" className="footer-link">Careers</a>
-                <a href="#press" className="footer-link">Press Kit</a>
+            <div className="pricing-card">
+              <div className="pricing-header">
+                <h3 className="pricing-title">Enterprise</h3>
+                <div className="pricing-price">
+                  <span className="price-amount">Custom</span>
+                </div>
               </div>
-
-              <div className="footer-column">
-                <h4 className="footer-column-title">Resources</h4>
-                <a href="#docs" className="footer-link">Documentation</a>
-                <a href="#help" className="footer-link">Help Center</a>
-                <a href="#community" className="footer-link">Community</a>
-                <a href="#status" className="footer-link">System Status</a>
-              </div>
-
-              <div className="footer-column">
-                <h4 className="footer-column-title">Legal</h4>
-                <a href="#privacy" className="footer-link">Privacy Policy</a>
-                <a href="#terms" className="footer-link">Terms of Service</a>
-                <a href="#security" className="footer-link">Security</a>
-                <a href="#gdpr" className="footer-link">GDPR</a>
-              </div>
+              <ul className="pricing-features">
+                <li>✓ Unlimited photos</li>
+                <li>✓ White-label solution</li>
+                <li>✓ API access</li>
+                <li>✓ Dedicated support</li>
+                <li>✓ Custom integrations</li>
+                <li>✓ SLA guarantee</li>
+              </ul>
+              <Link to="/contact" className="btn-pricing">
+                Contact Sales
+              </Link>
             </div>
           </div>
 
+          <div className="pricing-note">
+            <p>All plans include 14-day free trial • No credit card required • Cancel anytime</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="final-cta-section">
+        <div className="final-cta-container">
+          <h2 className="cta-title">Ready to Transform Your Event Photography?</h2>
+          <p className="cta-subtitle">Join 500+ event professionals using PhotoEvents today</p>
+          <div className="cta-actions">
+            <Link to="/register" className="btn-cta-primary">
+              Start Free Trial - No Credit Card Required
+            </Link>
+            <Link to="/dashboard" className="btn-cta-secondary">
+              View Demo Dashboard
+            </Link>
+          </div>
+          <div className="cta-trust">
+            <span>✓ 14-day free trial</span>
+            <span>✓ No credit card</span>
+            <span>✓ Cancel anytime</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-grid">
+            <div className="footer-column">
+              <div className="footer-brand">
+                <span className="brand-icon">📸</span>
+                <span className="brand-name">PhotoEvents</span>
+              </div>
+              <p className="footer-description">
+                AI-powered event photo delivery platform. Save time, delight guests.
+              </p>
+              <div className="footer-social">
+                <a href="#facebook" aria-label="Facebook">📘</a>
+                <a href="#twitter" aria-label="Twitter">🐦</a>
+                <a href="#linkedin" aria-label="LinkedIn">💼</a>
+                <a href="#instagram" aria-label="Instagram">📷</a>
+              </div>
+            </div>
+
+            <div className="footer-column">
+              <h4 className="footer-title">Product</h4>
+              <ul className="footer-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#security">Security</a></li>
+                <li><a href="#updates">Updates</a></li>
+              </ul>
+            </div>
+
+            <div className="footer-column">
+              <h4 className="footer-title">Company</h4>
+              <ul className="footer-links">
+                <li><a href="#about">About</a></li>
+                <li><a href="#careers">Careers</a></li>
+                <li><a href="#press">Press</a></li>
+                <li><a href="#contact">Contact</a></li>
+              </ul>
+            </div>
+
+            <div className="footer-column">
+              <h4 className="footer-title">Resources</h4>
+              <ul className="footer-links">
+                <li><a href="#blog">Blog</a></li>
+                <li><a href="#help">Help Center</a></li>
+                <li><a href="#api">API Docs</a></li>
+                <li><a href="#guides">Guides</a></li>
+              </ul>
+            </div>
+
+            <div className="footer-column">
+              <h4 className="footer-title">Legal</h4>
+              <ul className="footer-links">
+                <li><a href="#privacy">Privacy</a></li>
+                <li><a href="#terms">Terms</a></li>
+                <li><a href="#cookies">Cookies</a></li>
+                <li><a href="#gdpr">GDPR</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="footer-newsletter">
+            <h4 className="newsletter-title">Stay Updated</h4>
+            <p className="newsletter-text">Get the latest features and tips delivered to your inbox</p>
+            <form className="newsletter-form">
+              <input 
+                type="email" 
+                placeholder="Enter your email" 
+                className="newsletter-input"
+              />
+              <button type="submit" className="newsletter-button">Subscribe</button>
+            </form>
+          </div>
+
           <div className="footer-bottom">
-            <div className="footer-copy">
-              © 2026 PhotoManEa. All rights reserved.
-            </div>
-            <div className="footer-badges">
-              <span className="footer-badge">🔒 SSL Secured</span>
-              <span className="footer-badge">✅ GDPR Compliant</span>
-              <span className="footer-badge">☁️ Cloud Hosted</span>
-            </div>
+            <p>© 2026 PhotoEvents. All rights reserved.</p>
           </div>
         </div>
       </footer>
