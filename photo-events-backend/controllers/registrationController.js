@@ -35,11 +35,12 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
     throw new AppError('Event not found or may have been deleted', 404);
   }
 
-  // Check if already registered
-  const existingRegistration = await Registration.findOne({ eventId, email });
-  if (existingRegistration) {
-    throw new AppError('Email already registered for this event', 409);
-  }
+  // ✅ REMOVED: Duplicate email check (lines 38-41)
+  // Same email can now register multiple times for same event
+  // const existingRegistration = await Registration.findOne({ eventId, email });
+  // if (existingRegistration) {
+  //   throw new AppError('Email already registered for this event', 409);
+  // }
 
   // Process selfie if provided
   let faceEmbedding = null;
@@ -75,7 +76,7 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Create registration
+  // ✅ Create registration (no duplicate check)
   const registration = await Registration.create({
     eventId,
     name,
@@ -105,6 +106,7 @@ exports.registerGuest = asyncHandler(async (req, res, next) => {
     res,
     {
       id: registration._id,
+      registrationId: registration._id, // ✅ Added for frontend navigation
       name: registration.name,
       email: registration.email,
       eventName: event.name,

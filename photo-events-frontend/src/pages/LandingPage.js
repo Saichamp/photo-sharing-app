@@ -358,19 +358,7 @@ const LandingPage = () => {
               </div>
             </div>
 
-            {/* Floating Elements */}
-            <div className="floating-element float-1">
-              <div className="float-icon">⚡</div>
-              <div className="float-text">Instant Processing</div>
-            </div>
-            <div className="floating-element float-2">
-              <div className="float-icon">🎯</div>
-              <div className="float-text">99.8% Accurate</div>
-            </div>
-            <div className="floating-element float-3">
-              <div className="float-icon">🚀</div>
-              <div className="float-text">Save 200h/event</div>
-            </div>
+
           </div>
         </div>
       </section>
