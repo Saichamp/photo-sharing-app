@@ -44,7 +44,6 @@ const RegistrationSchema = new mongoose.Schema({
 });
 
 // ✅ FIXED: Compound unique index prevents duplicate email per event
-RegistrationSchema.index({ eventId: 1, email: 1 }, { unique: true });
 
 // Index for performance
 RegistrationSchema.index({ registeredAt: -1 });
