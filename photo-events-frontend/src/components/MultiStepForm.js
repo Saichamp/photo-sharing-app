@@ -507,7 +507,7 @@ if (registrationId) {
           <div className="step-content success">
             <div className="success-celebration">
               <div className="celebration-animation">🎉</div>
-              <h2>Welcome to PhotoEvents!</h2>
+              <h2>Welcome to PhotoManea!</h2>
               <p>Your registration is complete and you're ready to receive photos automatically</p>
             </div>
 
@@ -533,9 +533,7 @@ if (registrationId) {
               <button onClick={() => navigate('/')} className="btn-success-primary">
                 🏠 Return to Home
               </button>
-              <button onClick={() => navigate('/dashboard')} className="btn-success-secondary">
-                📊 View Dashboard
-              </button>
+              
             </div>
 
             <div className="success-tips">
@@ -603,14 +601,9 @@ if (registrationId) {
           <div className="hero-nav">
             <div className="brand-logo">
               <span className="logo-icon">📸</span>
-              <span className="logo-text">PhotoEvents</span>
+              <span className="logo-text">PhotoManea</span>
             </div>
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="btn-nav-link"
-            >
-              Dashboard →
-            </button>
+           
           </div>
 
           {eventInfo && (
@@ -653,7 +646,7 @@ if (registrationId) {
             <div className="event-showcase">
               <div className="event-badge">
                 <span className="badge-icon">✨</span>
-                PhotoEvents Registration
+                PhotoManea Registration
               </div>
               
               <h1 className="event-title">Join the Photo Experience</h1>
@@ -779,7 +772,7 @@ if (registrationId) {
             {/* Social Proof */}
             <div className="testimonial">
               <div className="testimonial-content">
-                <p>"PhotoEvents found 47 photos of me at the wedding. I didn't have to ask anyone!"</p>
+                <p>"PhotoManea found 47 photos of me at the wedding. I didn't have to ask anyone!"</p>
                 <div className="testimonial-author">
                   <div className="author-avatar">👤</div>
                   <div>
