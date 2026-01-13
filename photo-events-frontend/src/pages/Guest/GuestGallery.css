@@ -1,0 +1,162 @@
+/* ===============================
+   PHOTO GRID
+================================ */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-6);
+}
+
+/* ===============================
+   PHOTO CARD
+================================ */
+.photo-card {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--gray-100);
+  cursor: pointer;
+}
+
+.photo-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ===============================
+   SINGLE DOWNLOAD BUTTON
+================================ */
+.photo-download-btn {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: var(--radius-full);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+/* Show on hover (desktop) */
+.photo-card:hover .photo-download-btn {
+  opacity: 1;
+}
+
+/* ===============================
+   CHECKBOX (MULTI SELECT)
+================================ */
+.photo-checkbox {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  width: 18px;
+  height: 18px;
+  accent-color: var(--purple-500);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+/* Show checkbox on hover or selected */
+.photo-card:hover .photo-checkbox,
+.photo-checkbox:checked {
+  opacity: 1;
+}
+
+/* Selected state */
+.photo-checkbox:checked ~ img {
+  outline: 3px solid var(--purple-400);
+  outline-offset: -3px;
+}
+
+/* ===============================
+   BULK ACTION BAR
+================================ */
+.photo-toolbar {
+  position: sticky;
+  bottom: var(--space-6);
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-lg);
+  margin-top: var(--space-6);
+  z-index: 20;
+}
+
+.selection-count {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
+/* ===============================
+   BUTTONS
+================================ */
+.btn {
+  height: 40px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--purple-500);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: var(--purple-600);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--gray-300);
+  color: var(--gray-700);
+}
+
+/* ===============================
+   RESPONSIVE FIXES
+================================ */
+
+/* Tablet */
+@media (max-width: 768px) {
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .photo-download-btn,
+  .photo-checkbox {
+    opacity: 1; /* Always visible on touch */
+  }
+
+  .photo-toolbar {
+    flex-direction: column;
+    gap: var(--space-4);
+    text-align: center;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .photo-grid {
+    grid-template-columns: 1fr;
+  }
+}
