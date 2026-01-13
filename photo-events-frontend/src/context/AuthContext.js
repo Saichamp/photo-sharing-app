@@ -37,33 +37,33 @@ export const AuthProvider = ({ children }) => {
   /**
    * Check if user is authenticated and load user data
    */
-  const checkAuth = async () => {
-    try {
-      const token = authService.getToken();
-      const storedUser = authService.getUser();
-      
-      if (token && storedUser) {
-        // User data exists in localStorage
-        setUser(storedUser);
-        
-        // Optionally fetch fresh user data from server
-        try {
-          const response = await authService.getProfile();
-          setUser(response.data);
-        } catch (err) {
-          // If profile fetch fails, use stored data
-          console.warn('Failed to fetch fresh profile, using cached data');
-        }
-      }
-    } catch (err) {
-      console.error('Auth check failed:', err);
-      // Clear invalid auth data
-      authService.clearTokens();
+const checkAuth = async () => {
+  try {
+    const token = authService.getToken();
+    const storedUser = authService.getUser();
+    
+    if (!token || !storedUser) {
       setUser(null);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    // Optionally fetch fresh user data from server
+    try {
+      const response = await authService.getProfile();
+      setUser(response.data);
+    } catch (err) {
+      // If profile fetch fails, use stored data
+      console.warn('Failed to fetch fresh profile, using cached data');
+    }
+  } catch (err) {
+    console.error('Auth check failed:', err);
+    // Clear invalid auth data
+    authService.clearTokens();
+    setUser(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   /**
    * Login user with credentials
@@ -81,21 +81,26 @@ export const AuthProvider = ({ children }) => {
         ? { email: emailOrCredentials, password }
         : emailOrCredentials;
       
-      const response = await authService.login(credentials);
-      
-      // authService.login already stores tokens and user data
-      const userData = response.data.user;
-      setUser(userData);
-      
-      return response;
-    } catch (err) {
-      const message = err.response?.data?.message || err.message || 'Login failed';
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    const response = await authService.login(credentials);
+    
+    // authService.login already stores tokens and user data
+    const userData = response.data.user;
+    setUser(userData);
+    
+    return response;
+  } catch (err) {
+    authService.clearTokens(); // 🔥 IMPORTANT
+    setUser(null);             // 🔥 IMPORTANT
+
+    const message =
+      err.response?.data?.message || 'Invalid email or password';
+
+    setError(message);
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+};
 
   /**
    * Register new user

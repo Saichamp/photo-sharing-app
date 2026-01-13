@@ -47,21 +47,25 @@ export const LoginPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  e.stopPropagation();  // ✅ EXTRA PROTECTION
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    setLoading(true);
-    try {
-      await login(formData);
-      navigate(from, { replace: true });
-    } catch (err) {
-      console.error('Login failed:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    await login(formData);
+    navigate(from, { replace: true });
+  } catch (err) {
+    // ✅ DO NOTHING - AuthContext handles it perfectly
+    console.error('Login failed:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   return (
     <div className="auth-container">
