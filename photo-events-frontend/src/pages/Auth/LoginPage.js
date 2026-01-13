@@ -185,9 +185,9 @@ const handleSubmit = async (e) => {
                 <input type="checkbox" />
                 <span>Remember me</span>
               </label>
-              <Link to="/forgot-password" className="auth-link">
+              {/* <Link to="/forgot-password" className="auth-link">
                 Forgot password?
-              </Link>
+              </Link> */}
             </div>
 
             {/* Submit Button */}

@@ -7,10 +7,9 @@ const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    email: user?.email || '',
     phone: user?.phone || '',
     company: user?.company || '',
     currentPassword: '',
@@ -29,18 +28,16 @@ const ProfilePage = () => {
     setMessage(null);
 
     try {
-      // Update profile logic here
       await updateProfile({
         name: formData.name,
-        email: formData.email,
         phone: formData.phone,
         company: formData.company
       });
 
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setMessage({ type: 'success', text: 'Profile updated successfully' });
       setIsEditing(false);
     } catch (error) {
-      setMessage({ type: 'error', text: error.message || 'Failed to update profile' });
+      setMessage({ type: 'error', text: error.message || 'Update failed' });
     } finally {
       setLoading(false);
     }
@@ -48,7 +45,7 @@ const ProfilePage = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
+
     if (formData.newPassword !== formData.confirmPassword) {
       setMessage({ type: 'error', text: 'Passwords do not match' });
       return;
@@ -58,11 +55,15 @@ const ProfilePage = () => {
     setMessage(null);
 
     try {
-      // Change password logic here
-      setMessage({ type: 'success', text: 'Password changed successfully!' });
-      setFormData({ ...formData, currentPassword: '', newPassword: '', confirmPassword: '' });
+      setMessage({ type: 'success', text: 'Password changed successfully' });
+      setFormData({
+        ...formData,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
     } catch (error) {
-      setMessage({ type: 'error', text: error.message || 'Failed to change password' });
+      setMessage({ type: 'error', text: error.message || 'Password change failed' });
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ const ProfilePage = () => {
     <div className="profile-page">
       <div className="profile-header">
         <h2>Profile Settings</h2>
-        <p>Manage your account information and preferences</p>
+        <p>Manage your personal information and security</p>
       </div>
 
       {message && (
@@ -81,15 +82,12 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* Profile Information */}
+      {/* Personal Info */}
       <div className="profile-section">
         <div className="section-header">
           <h3>Personal Information</h3>
           {!isEditing && (
-            <button 
-              onClick={() => setIsEditing(true)}
-              className="btn btn-secondary"
-            >
+            <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>
               Edit Profile
             </button>
           )}
@@ -101,10 +99,10 @@ const ProfilePage = () => {
               <label>Full Name</label>
               <input
                 type="text"
+                className="form-input"
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 disabled={!isEditing}
-                className="form-input"
               />
             </div>
 
@@ -112,11 +110,11 @@ const ProfilePage = () => {
               <label>Email Address</label>
               <input
                 type="email"
-                value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                disabled={!isEditing}
-                className="form-input"
+                className="form-input readonly"
+                value={user?.email || ''}
+                disabled
               />
+              <span className="field-hint">Email cannot be changed</span>
             </div>
           </div>
 
@@ -125,22 +123,22 @@ const ProfilePage = () => {
               <label>Phone Number</label>
               <input
                 type="tel"
+                className="form-input"
                 value={formData.phone}
                 onChange={(e) => handleChange('phone', e.target.value)}
                 disabled={!isEditing}
-                className="form-input"
                 placeholder="Optional"
               />
             </div>
 
             <div className="form-group">
-              <label>Company/Organization</label>
+              <label>Company</label>
               <input
                 type="text"
+                className="form-input"
                 value={formData.company}
                 onChange={(e) => handleChange('company', e.target.value)}
                 disabled={!isEditing}
-                className="form-input"
                 placeholder="Optional"
               />
             </div>
@@ -148,19 +146,10 @@ const ProfilePage = () => {
 
           {isEditing && (
             <div className="form-actions">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="btn btn-secondary"
-                disabled={loading}
-              >
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditing(false)}>
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
-              >
+              <button type="submit" className="btn btn-primary" disabled={loading}>
                 {loading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
@@ -168,74 +157,26 @@ const ProfilePage = () => {
         </form>
       </div>
 
-      {/* Account Stats */}
-      <div className="profile-section">
-        <h3>Account Statistics</h3>
-        <div className="stats-grid-small">
-          <div className="stat-item">
-            <span className="stat-label">Member Since</span>
-            <span className="stat-value">
-              {new Date(user?.createdAt || Date.now()).toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'long' 
-              })}
-            </span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Total Events</span>
-            <span className="stat-value">{user?.eventsCreated || 0}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Storage Used</span>
-            <span className="stat-value">
-              {((user?.storageUsed || 0) / 1024 / 1024).toFixed(2)} MB
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Change Password */}
       <div className="profile-section">
         <h3>Change Password</h3>
-        <form onSubmit={handleChangePassword} className="password-form">
+        <form className="password-form" onSubmit={handleChangePassword}>
           <div className="form-group">
             <label>Current Password</label>
-            <input
-              type="password"
-              value={formData.currentPassword}
-              onChange={(e) => handleChange('currentPassword', e.target.value)}
-              className="form-input"
-              placeholder="Enter current password"
-            />
+            <input type="password" className="form-input" onChange={(e) => handleChange('currentPassword', e.target.value)} />
           </div>
 
           <div className="form-group">
             <label>New Password</label>
-            <input
-              type="password"
-              value={formData.newPassword}
-              onChange={(e) => handleChange('newPassword', e.target.value)}
-              className="form-input"
-              placeholder="Enter new password"
-            />
+            <input type="password" className="form-input" onChange={(e) => handleChange('newPassword', e.target.value)} />
           </div>
 
           <div className="form-group">
             <label>Confirm New Password</label>
-            <input
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) => handleChange('confirmPassword', e.target.value)}
-              className="form-input"
-              placeholder="Confirm new password"
-            />
+            <input type="password" className="form-input" onChange={(e) => handleChange('confirmPassword', e.target.value)} />
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading || !formData.currentPassword || !formData.newPassword}
-          >
+          <button className="btn btn-primary" disabled={loading}>
             {loading ? 'Changing...' : 'Change Password'}
           </button>
         </form>

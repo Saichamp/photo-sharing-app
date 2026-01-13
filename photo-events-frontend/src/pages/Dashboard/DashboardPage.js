@@ -1,226 +1,226 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { eventAPI } from '../../services/api';
 import { Loader } from '../../components/common/Loader';
 import CreateEvent from './CreateEvent';
 import EventList from './EventList';
 import PhotoUpload from './PhotoUpload';
-import EventPhotoGallery from '../../components/dashboard/EventPhotoGallery'; // ✅ ADDED
+//import EventPhotoGallery from '../../components/dashboard/EventPhotoGallery';
 import Analytics from './Analytics';
 import ProfilePage from './ProfilePage';
 import BillingPage from './BillingPage';
 import './DashboardPage.css';
 
+
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   
   const [events, setEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    upcomingEvents: 0,
+    activeEvents: 0,
+    completedEvents: 0,
+    totalPhotos: 0,
+    totalGuests: 0
+  });
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Load all events
+  // Load all events + calculate stats
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('🔄 Loading events...');
-      
       const response = await eventAPI.getAll();
-      const eventsData = response.data?.data?.events || response.data?.events || [];
+      const eventsData = response.data?.data?.events || [];
       
-      console.log('✅ Events loaded:', eventsData);
+      // Calculate perfect stats
+      const totalEvents = eventsData.length;
+      const upcomingEvents = eventsData.filter(e => e.status === 'upcoming').length;
+      const activeEvents = eventsData.filter(e => e.status === 'active').length;
+      const completedEvents = eventsData.filter(e => e.status === 'completed').length;
+      const totalPhotos = eventsData.reduce((sum, e) => sum + (e.photosUploaded || 0), 0);
+      const totalGuests = eventsData.reduce((sum, e) => sum + (e.registrationCount || 0), 0);
+
       setEvents(eventsData);
-      
+      setStats({
+        totalEvents,
+        upcomingEvents,
+        activeEvents,
+        completedEvents,
+        totalPhotos,
+        totalGuests
+      });
     } catch (error) {
-      console.error('❌ Failed to load events:', error);
+      console.error('Failed to load events:', error);
       setEvents([]);
+      setStats({ totalEvents: 0, upcomingEvents: 0, activeEvents: 0, completedEvents: 0, totalPhotos: 0, totalGuests: 0 });
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
 
-  // Handle any data change
-  const handleDataChange = useCallback(() => {
-    console.log('🔄 Data changed, reloading...');
-    loadEvents();
-  }, [loadEvents]);
+  const handleDataChange = () => loadEvents();
 
-  // Handle event creation success
-  const handleEventCreated = useCallback((newEvent) => {
-    console.log('🎉 Event created:', newEvent);
-    loadEvents();
-    setTimeout(() => navigate('/dashboard'), 300);
-  }, [loadEvents, navigate]);
+  const isActive = (path) => location.pathname === path;
 
-  // Calculate stats
-  const stats = {
-    totalEvents: events.length,
-    upcomingEvents: events.filter(e => e.status === 'upcoming').length,
-    activeEvents: events.filter(e => e.status === 'active').length,
-    completedEvents: events.filter(e => e.status === 'completed').length,
-    totalPhotos: events.reduce((sum, e) => sum + (e.photosUploaded || 0), 0),
-    totalGuests: events.reduce((sum, e) => sum + (e.registrationCount || 0), 0)
-  };
-
-  const isTabActive = (tab) => {
-    const path = location.pathname;
-    if (tab === 'events') return path === '/dashboard' || path === '/dashboard/';
-    return path.includes(tab);
-  };
+  if (loading) {
+    return (
+      <div className="dashboard-loading">
+        <Loader size="lg" />
+        <p className="loading-text">Loading your dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1>Welcome back, {user?.name}! 👋</h1>
-          <p>Manage your events and photos with AI-powered face recognition</p>
-        </div>
-      </div>
+      {/* Mobile Sidebar Toggle */}
+      <button className="mobile-sidebar-toggle" onClick={() => setSidebarOpen(true)}>
+        <svg className="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
 
-      {loading ? (
-        <div className="dashboard-loading">
-          <Loader />
-          <p>Loading dashboard...</p>
-        </div>
-      ) : (
-        <>
-          {/* Stats Cards */}
-          <div className="dashboard-stats">
-            <div className="stat-card">
-              <div className="stat-icon">📅</div>
-              <div className="stat-info">
-                <h3>{stats.totalEvents}</h3>
-                <p>TOTAL EVENTS</p>
-                <span className="stat-detail">{stats.upcomingEvents}/{stats.totalEvents} used</span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">📸</div>
-              <div className="stat-info">
-                <h3>{stats.totalPhotos}</h3>
-                <p>PHOTOS UPLOADED</p>
-                <span className="stat-detail">{stats.activeEvents} Active</span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">👥</div>
-              <div className="stat-info">
-                <h3>{stats.totalGuests}</h3>
-                <p>REGISTERED GUESTS</p>
-                <span className="stat-detail">{stats.upcomingEvents} Upcoming</span>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">✅</div>
-              <div className="stat-info">
-                <h3>FREE</h3>
-                <p>CURRENT PLAN</p>
-                <Link to="/dashboard/billing">Upgrade Plan →</Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="dashboard-content">
-            {/* Sidebar Tabs */}
-            <div className="dashboard-sidebar">
-              <Link
-                to="/dashboard"
-                className={`tab-link ${isTabActive('events') ? 'active' : ''}`}
-              >
-                📅 Events
-              </Link>
-              <Link
-                to="/dashboard/create"
-                className={`tab-link ${isTabActive('create') ? 'active' : ''}`}
-              >
-                ➕ Create Event
-              </Link>
-              <Link
-                to="/dashboard/upload"
-                className={`tab-link ${isTabActive('upload') ? 'active' : ''}`}
-              >
-                ⬆️ Upload Photos
-              </Link>
-              <Link
-                to="/dashboard/analytics"
-                className={`tab-link ${isTabActive('analytics') ? 'active' : ''}`}
-              >
-                📊 Analytics
-              </Link>
-            </div>
-
-            {/* Content Area */}
-            <div className="dashboard-main">
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    <EventList
-                      events={events}
-                      onRefresh={handleDataChange}
-                    />
-                  }
-                />
-                <Route
-                  path="/create"
-                  element={
-                    <CreateEvent
-                      onEventCreated={handleEventCreated}
-                    />
-                  }
-                />
-                <Route
-                  path="/upload"
-                  element={
-                    <>
-                      {/* ✅ PHOTO UPLOAD SECTION */}
-                      <PhotoUpload
-                        events={events}
-                        selectedEvent={selectedEvent}
-                        onEventSelect={setSelectedEvent}
-                        onPhotosUploaded={handleDataChange} // ✅ Refresh on upload
-                      />
-                      
-                      {/* ✅ PHOTO GALLERY SECTION (NEW!) */}
-                      {selectedEvent && (
-                        <div style={{ marginTop: '40px' }}>
-                          <EventPhotoGallery 
-                            event={selectedEvent}
-                            key={selectedEvent._id} // ✅ Force re-render on event change
-                          />
-                        </div>
-                      )}
-                    </>
-                  }
-                />
-                <Route
-                  path="/analytics"
-                  element={
-                    <Analytics
-                      events={events}
-                      onRefresh={handleDataChange}
-                    />
-                  }
-                />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/billing" element={<BillingPage />} />
-              </Routes>
-            </div>
-          </div>
-        </>
+      {/* Sidebar Overlay (Mobile) */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
+
+      {/* Sidebar */}
+      <aside className={`dashboard-sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-header">
+          <h2>Quick Actions</h2>
+          <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>
+            ×
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
+          <Link 
+            to="/dashboard" 
+            className={`nav-link ${isActive('/dashboard') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">📅</span>
+            <span>Events ({stats.totalEvents})</span>
+            <span className="badge">
+              {stats.upcomingEvents} upcoming
+            </span>
+          </Link>
+
+          <Link 
+            to="/dashboard/create" 
+            className={`nav-link ${isActive('/dashboard/create') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">➕</span>
+            <span>New Event</span>
+          </Link>
+
+          <Link 
+            to="/dashboard/upload" 
+            className={`nav-link ${isActive('/dashboard/upload') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">⬆️</span>
+            <span>Upload Photos</span>
+            <span className="badge">{stats.totalPhotos} photos</span>
+          </Link>
+
+          <Link 
+            to="/dashboard/analytics" 
+            className={`nav-link ${isActive('/dashboard/analytics') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">📊</span>
+            <span>Analytics</span>
+          </Link>
+
+          <div className="nav-divider" />
+
+   { /*      <Link 
+            to="/dashboard/guests" 
+            className={`nav-link ${isActive('/dashboard/guests') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">👥</span>
+            <span>Guests ({stats.totalGuests})</span>
+          </Link>
+
+          <Link 
+            to="/dashboard/billing" 
+            className={`nav-link ${isActive('/dashboard/billing') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">💎</span>
+            <span>Billing</span>
+          </Link>
+
+          <Link 
+            to="/dashboard/profile" 
+            className={`nav-link ${isActive('/dashboard/profile') ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="nav-icon">⚙️</span>
+            <span>Profile</span>
+          </Link> */}
+        </nav>
+      </aside>
+
+      {/* Main Content */}
+      <main className="dashboard-main">
+        {/* Header */}
+        <header className="dashboard-header">
+          <div className="header-left">
+            <h1>Welcome back, {user?.name}! 👋</h1>
+            <p>Manage your events with AI-powered face recognition</p>
+          </div>
+          
+          {/* Stats Overview */}
+          <div className="header-stats">
+            <div className="stat-mini">
+              <span className="stat-number">{stats.totalEvents}</span>
+              <span className="stat-label">Events</span>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-mini">
+              <span className="stat-number">{stats.upcomingEvents}</span>
+              <span className="stat-label">Upcoming</span>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-mini">
+              <span className="stat-number">{stats.activeEvents}</span>
+              <span className="stat-label">Active</span>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-mini">
+              <span className="stat-number">{stats.completedEvents}</span>
+              <span className="stat-label">Completed</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Content */}
+        <div className="dashboard-content">
+          <Routes>
+            <Route path="/" element={<EventList events={events} onRefresh={handleDataChange} />} />
+            <Route path="/create" element={<CreateEvent onEventCreated={handleDataChange} />} />
+            <Route path="/upload" element={<PhotoUpload events={events} onPhotosUploaded={handleDataChange} />} />
+            <Route path="/analytics" element={<Analytics events={events} onRefresh={handleDataChange} />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/guests" element={<div>Guests Page Coming Soon</div>} />
+          </Routes>
+        </div>
+      </main>
     </div>
   );
 };
