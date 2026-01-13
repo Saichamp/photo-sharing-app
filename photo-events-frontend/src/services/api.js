@@ -57,10 +57,16 @@ api.interceptors.response.use(
         
         return api(originalRequest);
       } catch (refreshError) {
-        authService.clearTokens();
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
+  authService.clearTokens();
+
+  // 🔥 DO NOT force reload during login
+  if (authService.getToken()) {
+    window.location.href = '/login';
+  }
+
+  return Promise.reject(refreshError);
+}
+
     }
     
     return Promise.reject(error);
