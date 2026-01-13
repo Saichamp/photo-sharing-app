@@ -1,191 +1,297 @@
-/* Billing Page Styles */
+/* BillingPage.css - Modern billing UI with purple/pink palette */
+
 .billing-page {
-  max-width: 1200px;
+  padding: 2rem;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
+/* Header */
 .billing-header {
   margin-bottom: 2rem;
 }
 
 .billing-header h2 {
-  font-size: 1.75rem;
+  color: var(--gray-900);
+  font-size: 1.875rem;
   font-weight: 700;
-  color: #1e293b;
   margin: 0 0 0.5rem 0;
 }
 
 .billing-header p {
-  color: #64748b;
-  font-size: 0.95rem;
+  color: var(--gray-500);
+  font-size: 1rem;
   margin: 0;
 }
 
 /* Current Plan Banner */
 .current-plan-banner {
-  background: linear-gradient(135deg, #dea193 0%, #ec4899 100%);
-  border-radius: 16px;
+  background: var(--gradient-hero);
+  border-radius: var(--radius-2xl);
   padding: 2rem;
   margin-bottom: 2rem;
-  box-shadow: 0 8px 24px rgba(222, 161, 147, 0.3);
+  color: white;
+  box-shadow: var(--shadow-xl);
 }
 
 .banner-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
   gap: 2rem;
-  color: white;
+}
+
+.plan-info {
+  flex: 1;
+}
+
+.plan-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
 }
 
 .plan-info h3 {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 800;
   margin: 0 0 0.5rem 0;
 }
 
-.plan-info p {
+.plan-price-info {
   font-size: 1rem;
-  opacity: 0.9;
   margin: 0;
+  opacity: 0.95;
 }
 
-.plan-usage {
+/* Usage Section */
+.usage-section {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-2xl);
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.usage-section h3 {
+  color: var(--gray-900);
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+}
+
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.usage-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  transition: all var(--transition-base);
+}
+
+.usage-card:hover {
+  background: white;
+  border-color: var(--purple-300);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.usage-header {
   display: flex;
-  gap: 2rem;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
-.usage-item {
+.usage-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.usage-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
 .usage-label {
-  font-size: 0.75rem;
-  opacity: 0.8;
+  font-size: 0.875rem;
+  color: var(--gray-600);
   font-weight: 500;
 }
 
 .usage-value {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  line-height: 1;
 }
 
-/* Billing Toggle */
+.usage-bar-container {
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.usage-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: all var(--transition-slow);
+}
+
+.usage-bar.good {
+  background: linear-gradient(90deg, var(--success) 0%, #059669 100%);
+}
+
+.usage-bar.warning {
+  background: linear-gradient(90deg, var(--warning) 0%, #fb923c 100%);
+}
+
+.usage-bar.critical {
+  background: linear-gradient(90deg, var(--error) 0%, #dc2626 100%);
+}
+
+/* Billing Toggle Section */
+.billing-toggle-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.billing-toggle-section h3 {
+  color: var(--gray-900);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem 0;
+}
+
 .billing-toggle {
-  display: flex;
-  justify-content: center;
+  display: inline-flex;
   gap: 0.5rem;
-  margin-bottom: 3rem;
-  background: #f1f5f9;
+  background: var(--gray-100);
   padding: 0.5rem;
-  border-radius: 12px;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
+  border-radius: var(--radius-xl);
 }
 
 .toggle-btn {
   padding: 0.75rem 1.5rem;
   border: none;
+  border-radius: var(--radius-lg);
   background: transparent;
-  color: #64748b;
+  color: var(--gray-600);
+  font-size: 0.875rem;
   font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  transition: all var(--transition-base);
+  position: relative;
 }
 
 .toggle-btn:hover {
-  color: #1e293b;
+  color: var(--gray-900);
 }
 
 .toggle-btn.active {
   background: white;
-  color: #1e293b;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  color: var(--purple-600);
+  box-shadow: var(--shadow-sm);
 }
 
 .save-badge {
-  background: #10b981;
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--gradient-purple);
   color: white;
-  padding: 0.125rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.7rem;
+  border-radius: var(--radius-full);
+  font-size: 0.625rem;
   font-weight: 700;
 }
 
 /* Plans Grid */
 .plans-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 2rem;
   margin-bottom: 3rem;
 }
 
 .plan-card {
   background: white;
-  border: 3px solid #e2e8f0;
-  border-radius: 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-2xl);
   padding: 2rem;
   position: relative;
-  transition: all 0.3s ease;
+  transition: all var(--transition-base);
+  display: flex;
+  flex-direction: column;
 }
 
 .plan-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+  box-shadow: var(--shadow-2xl);
 }
 
 .plan-card.recommended {
-  border-color: #dea193;
-  box-shadow: 0 8px 24px rgba(222, 161, 147, 0.2);
+  border-width: 3px;
 }
 
 .plan-card.current {
-  background: linear-gradient(135deg, #fff5f3 0%, #faf5ff 100%);
+  background: linear-gradient(135deg, var(--purple-50) 0%, var(--pink-50) 100%);
 }
 
-.recommended-badge,
-.current-badge {
+.recommended-badge {
   position: absolute;
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 0.375rem 1rem;
-  border-radius: 20px;
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--radius-full);
+  color: white;
   font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
-}
-
-.recommended-badge {
-  background: linear-gradient(135deg, #dea193 0%, #ec4899 100%);
-  color: white;
+  box-shadow: var(--shadow-md);
 }
 
 .current-badge {
-  background: #10b981;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--success);
   color: white;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
+/* Plan Header */
 .plan-header {
   text-align: center;
   margin-bottom: 2rem;
   padding-bottom: 2rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--gray-200);
 }
 
 .plan-header h3 {
+  color: var(--gray-900);
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #1e293b;
+  font-weight: 800;
   margin: 0 0 1rem 0;
 }
 
@@ -194,26 +300,33 @@
   align-items: baseline;
   justify-content: center;
   gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.price-currency {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-600);
 }
 
 .price-amount {
-  font-size: 3rem;
-  font-weight: 800;
-  color: #1e293b;
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: var(--gray-900);
   line-height: 1;
 }
 
 .price-period {
-  font-size: 1rem;
-  color: #64748b;
+  font-size: 1.125rem;
+  color: var(--gray-500);
   font-weight: 500;
 }
 
 .annual-savings {
-  margin-top: 0.5rem;
   font-size: 0.875rem;
-  color: #10b981;
+  color: var(--success);
   font-weight: 600;
+  margin: 0;
 }
 
 /* Plan Features */
@@ -221,6 +334,7 @@
   list-style: none;
   padding: 0;
   margin: 0 0 2rem 0;
+  flex: 1;
 }
 
 .plan-features li {
@@ -228,14 +342,14 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.75rem 0;
-  color: #475569;
-  font-size: 0.95rem;
+  color: var(--gray-700);
+  font-size: 0.9375rem;
 }
 
 .plan-features li svg {
-  color: #10b981;
+  color: var(--purple-500);
   flex-shrink: 0;
-  margin-top: 0.125rem;
+  margin-top: 2px;
 }
 
 /* Plan Button */
@@ -243,42 +357,40 @@
   width: 100%;
   padding: 1rem;
   border: none;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 1rem;
+  border-radius: var(--radius-xl);
   color: white;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .plan-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-lg);
+}
+
+.plan-button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .plan-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  opacity: 0.7;
 }
 
-.plan-button.current-btn {
-  background: #94a3b8 !important;
-}
-
-/* Billing Sections */
+/* Billing Section */
 .billing-section {
   background: white;
-  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-2xl);
   padding: 2rem;
   margin-bottom: 2rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .billing-section h3 {
+  color: var(--gray-900);
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1e293b;
   margin: 0 0 1.5rem 0;
 }
 
@@ -287,119 +399,173 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 2rem;
   padding: 1.5rem;
-  background: #f8fafc;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-xl);
 }
 
 .card-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .card-number {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1e293b;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--gray-900);
   margin: 0 0 0.25rem 0;
 }
 
 .card-expiry {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--gray-500);
   margin: 0;
 }
 
 /* Billing History */
+.billing-history {
+  overflow-x: auto;
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.history-table thead th {
-  text-align: left;
-  padding: 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #64748b;
-  border-bottom: 2px solid #e2e8f0;
+.history-table thead {
+  background: var(--gray-50);
 }
 
-.history-table tbody td {
+.history-table th {
   padding: 1rem;
-  font-size: 0.95rem;
-  color: #475569;
-  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.history-table td {
+  padding: 1rem;
+  font-size: 0.9375rem;
+  color: var(--gray-600);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.history-table tbody tr:hover {
+  background: var(--gray-50);
 }
 
 .status-badge {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .status-paid {
-  background: #d1fae5;
-  color: #065f46;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
 }
 
 .btn-link {
   background: none;
   border: none;
-  color: #dea193;
+  color: var(--purple-600);
   font-weight: 600;
   cursor: pointer;
-  font-size: 0.875rem;
+  padding: 0;
+  text-decoration: underline;
 }
 
 .btn-link:hover {
-  text-decoration: underline;
+  color: var(--purple-700);
+}
+
+.btn-secondary {
+  padding: 0.625rem 1.25rem;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-lg);
+  color: var(--gray-700);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-secondary:hover {
+  background: var(--purple-50);
+  border-color: var(--purple-400);
+  color: var(--purple-700);
 }
 
 /* FAQ */
 .billing-faq {
   background: white;
-  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-2xl);
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .billing-faq h3 {
+  color: var(--gray-900);
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 2rem 0;
-  text-align: center;
+  margin: 0 0 1.5rem 0;
 }
 
 .faq-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2rem;
+  gap: 1.5rem;
+}
+
+.faq-item {
+  padding: 1.5rem;
+  background: var(--gray-50);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--gray-200);
+  transition: all var(--transition-base);
+}
+
+.faq-item:hover {
+  background: white;
+  border-color: var(--purple-300);
+  box-shadow: var(--shadow-md);
 }
 
 .faq-item h4 {
+  color: var(--gray-900);
   font-size: 1rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
 }
 
 .faq-item p {
-  font-size: 0.875rem;
-  color: #64748b;
+  color: var(--gray-600);
+  font-size: 0.9375rem;
   line-height: 1.6;
   margin: 0;
 }
 
-/* Responsive */
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .plans-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .billing-page {
-    padding: 0 1rem;
+    padding: 1rem;
+  }
+
+  .current-plan-banner {
+    padding: 1.5rem;
   }
 
   .banner-content {
@@ -407,36 +573,60 @@
     align-items: flex-start;
   }
 
-  .plan-usage {
-    width: 100%;
-    justify-content: space-between;
+  .usage-grid {
+    grid-template-columns: 1fr;
   }
 
   .plans-grid {
     grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 
-  .billing-toggle {
-    width: 100%;
+  .price-amount {
+    font-size: 2.5rem;
   }
 
   .payment-method {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+  }
+
+  .btn-secondary {
+    width: 100%;
   }
 
   .history-table {
     font-size: 0.875rem;
   }
 
-  .history-table thead th,
-  .history-table tbody td {
+  .history-table th,
+  .history-table td {
     padding: 0.75rem 0.5rem;
   }
 
   .faq-grid {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .billing-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .plan-info h3 {
+    font-size: 1.25rem;
+  }
+
+  .usage-value {
+    font-size: 1.25rem;
+  }
+
+  .price-amount {
+    font-size: 2rem;
+  }
+
+  .plan-card {
+    padding: 1.5rem;
   }
 }

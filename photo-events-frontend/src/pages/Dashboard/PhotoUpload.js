@@ -2,18 +2,19 @@ import React, { useState, useRef } from 'react';
 import { photoAPI } from '../../services/api';
 import './PhotoUpload.css';
 
-const PhotoUpload = ({ events = [], selectedEvent, onEventSelect, onPhotosUploaded }) => {
+const PhotoUpload = ({ events = [], onPhotosUploaded }) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleEventChange = (e) => {
     const eventId = e.target.value;
     const event = events.find(ev => ev._id === eventId);
-    if (onEventSelect) onEventSelect(event);
+    setSelectedEvent(event);
     setUploadError(null);
     setUploadSuccess(false);
   };
